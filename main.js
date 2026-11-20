@@ -1,5 +1,5 @@
 // رابط التسجيل في الأكاديمية: ضع الرابط هنا وستتحدث كل أزرار «سجّل ابنك» تلقائيًا.
-var REGISTRATION_URL = '';
+var REGISTRATION_URL = 'https://salla.sa/sorog/أكاديمية-عزم/p235152384';
 
 (function () {
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
