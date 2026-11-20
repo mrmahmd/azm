@@ -75,6 +75,8 @@ var REGISTRATION_URL = 'https://salla.sa/sorog/أكاديمية-عزم/p23515238
   var layers = [].slice.call(document.querySelectorAll('[data-parallax]'));
   var ticking = false;
   var pending = [].slice.call(revealables);
+  // كل قسم يصعد ويستقر في مكانه بالتزامن مع حركة التمرير
+  var stages = [].slice.call(document.querySelectorAll('.section > .wrap, .cta > .wrap'));
 
   function update() {
     ticking = false;
@@ -95,12 +97,24 @@ var REGISTRATION_URL = 'https://salla.sa/sorog/أكاديمية-عزم/p23515238
     if (progress) progress.style.setProperty('--p', max > 0 ? (y / max).toFixed(4) : 0);
     if (reduceMotion) return;
 
-    // الواجهة الأولى: النص يبتعد ببطء ويخفت عند النزول
+    // الواجهة الأولى: النص يثبت مكانه ويخفت تدريجيًا عند النزول
     if (heroCopy && y < vh * 1.2) {
       var k = Math.min(1, y / (vh * 0.9));
-      heroCopy.style.transform = 'translate3d(0,' + (y * 0.18).toFixed(1) + 'px,0)';
-      heroCopy.style.opacity = (1 - k * 0.85).toFixed(3);
+      heroCopy.style.opacity = (1 - k * 0.7).toFixed(3);
     }
+
+    // دخول القسم التالي: يبدأ أسفل الشاشة منخفضًا وأصغر قليلًا وباهتًا، ثم يصعد ويكبر ويتضح مع التمرير
+    stages.forEach(function (wrap) {
+      var top = wrap.parentElement.getBoundingClientRect().top;
+      var p = Math.max(0, Math.min(1, (vh - top) / (vh * 0.55)));
+      var e = 1 - Math.pow(1 - p, 3);
+      if (e >= 1) {
+        if (wrap.style.transform) { wrap.style.transform = ''; wrap.style.opacity = ''; }
+        return;
+      }
+      wrap.style.transform = 'translate3d(0,' + ((1 - e) * 90).toFixed(1) + 'px,0) scale(' + (0.94 + 0.06 * e).toFixed(4) + ')';
+      wrap.style.opacity = (0.15 + 0.85 * e).toFixed(3);
+    });
 
     // الصور تتحرك داخل إطارها بسرعة مختلفة عن الصفحة
     layers.forEach(function (img) {
