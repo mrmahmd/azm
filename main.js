@@ -29,7 +29,7 @@ var REGISTRATION_URL = 'https://salla.sa/sorog/أكاديمية-عزم/p23515238
   }
 
   /* ظهور العناصر عند التمرير */
-  var revealables = document.querySelectorAll('.reveal, .seats');
+  var revealables = document.querySelectorAll('.reveal');
   if (reduceMotion || !('IntersectionObserver' in window)) {
     revealables.forEach(function (el) { el.classList.add('in'); });
   } else {
@@ -42,36 +42,15 @@ var REGISTRATION_URL = 'https://salla.sa/sorog/أكاديمية-عزم/p23515238
       });
     }, { rootMargin: '0px 0px -8% 0px', threshold: 0.12 });
     revealables.forEach(function (el) { io.observe(el); });
-
-    // مقاعد العرض تظهر واحدة تلو الأخرى
-    document.querySelectorAll('.seats-row i').forEach(function (dot, i) {
-      dot.style.transitionDelay = (0.25 + i * 0.04) + 's';
-    });
-  }
-
-  /* عدّاد السعر */
-  var counter = document.querySelector('[data-count]');
-  if (counter && !reduceMotion && 'IntersectionObserver' in window) {
-    var target = parseInt(counter.getAttribute('data-count'), 10);
-    var fmt = new Intl.NumberFormat('ar-SA');
-    var started = false;
-    new IntersectionObserver(function (entries, obs) {
-      if (!entries[0].isIntersecting || started) return;
-      started = true; obs.disconnect();
-      var from = 475, t0 = performance.now(), dur = 1400;
-      (function tick(now) {
-        var k = Math.min(1, (now - t0) / dur);
-        var eased = 1 - Math.pow(1 - k, 3);
-        counter.textContent = fmt.format(Math.round(from + (target - from) * eased));
-        if (k < 1) requestAnimationFrame(tick);
-      })(t0);
-    }, { threshold: 0.5 }).observe(counter);
   }
 
   /* شريط التقدم + الشريط العلوي + بارالاكس */
   var header = document.querySelector('.site-header');
   var progress = document.querySelector('.progress span');
-  var heroCopy = document.querySelector('[data-hero-copy]');
+  var navSections = Array.from(document.querySelectorAll('.nav-links a[href^="#"]'), function (link) {
+    return { link: link, section: document.getElementById(link.hash.slice(1)) };
+  }).filter(function (item) { return item.section; });
+  var currentLink = null;
   var layers = [].slice.call(document.querySelectorAll('[data-parallax]'));
   var ticking = false;
   var pending = [].slice.call(revealables);
@@ -95,13 +74,23 @@ var REGISTRATION_URL = 'https://salla.sa/sorog/أكاديمية-عزم/p23515238
 
     if (header) header.classList.toggle('scrolled', y > 10);
     if (progress) progress.style.setProperty('--p', max > 0 ? (y / max).toFixed(4) : 0);
-    if (reduceMotion) return;
 
-    // الواجهة الأولى: النص يثبت مكانه ويخفت تدريجيًا عند النزول
-    if (heroCopy && y < vh * 1.2) {
-      var k = Math.min(1, y / (vh * 0.9));
-      heroCopy.style.opacity = (1 - k * 0.7).toFixed(3);
+    // تمييز آخر قسم وصل إلى الشريط، مع إبراز التذييل عند نهاية الصفحة.
+    var marker = (header ? header.offsetHeight : 0) + 24;
+    var atPageEnd = max > 0 && y >= max - 2;
+    var nextLink = null;
+    for (var i = navSections.length - 1; i >= 0; i--) {
+      if (atPageEnd || navSections[i].section.getBoundingClientRect().top <= marker) {
+        nextLink = navSections[i].link;
+        break;
+      }
     }
+    if (nextLink !== currentLink) {
+      if (currentLink) currentLink.removeAttribute('aria-current');
+      if (nextLink) nextLink.setAttribute('aria-current', 'location');
+      currentLink = nextLink;
+    }
+    if (reduceMotion) return;
 
     // دخول القسم التالي: يبدأ أسفل الشاشة منخفضًا وأصغر قليلًا وباهتًا، ثم يصعد ويكبر ويتضح مع التمرير
     stages.forEach(function (wrap) {
