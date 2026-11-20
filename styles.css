@@ -276,8 +276,19 @@ button { font: inherit; }
 
 /* الملعب والأسئلة */
 .venue-grid { display: grid; gap: 40px; }
-.venue h2 { margin-bottom: 18px; }
-.venue-media { border-radius: var(--radius); overflow: hidden; aspect-ratio: 3 / 2; background: var(--paper); }
+.venue h2 { margin-bottom: 8px; }
+.venue-media {
+  margin-inline: -16px; aspect-ratio: 3 / 2;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 14%, #000 88%, transparent),
+    linear-gradient(to bottom, transparent, #000 18%, #000 74%, transparent);
+  -webkit-mask-composite: source-in;
+          mask-image:
+    linear-gradient(to right, transparent, #000 14%, #000 88%, transparent),
+    linear-gradient(to bottom, transparent, #000 18%, #000 74%, transparent);
+          mask-composite: intersect;
+}
+.venue-media img { filter: brightness(.88) saturate(.92); }
 .venue-note { margin-top: 12px; color: var(--text-soft); font-size: 14px; }
 .faq-title { margin-bottom: 18px; }
 .faq details { border-bottom: 1px solid var(--line); }
