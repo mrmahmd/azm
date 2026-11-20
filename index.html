@@ -4,26 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>أكاديمية عزم لكرة القدم | مهارة في الملعب، وقيم في الحياة</title>
-  <meta name="description" content="أكاديمية عزم لكرة القدم: تدريب كرة قدم ينمّي مهارات ابنك ويعلّمه الانضباط والاحترام وروح الفريق.">
+  <meta name="description" content="أكاديمية عزم لكرة القدم في حي الزهراء: تدريب كرة قدم ينمّي مهارات ابنك ويعلّمه الانضباط والاحترام وروح الفريق. عرض التأسيس ٢٩٩ ريال لأول ٢٠ مشترك.">
   <meta property="og:title" content="أكاديمية عزم لكرة القدم">
-  <meta property="og:description" content="مهارة في الملعب، وقيم في الحياة. سجّل ابنك في برامج تدريب عزم.">
+  <meta property="og:description" content="مهارة في الملعب، وقيم في الحياة. عرض التأسيس ٢٩٩ ريال بدل ٤٧٥ ريال لأول ٢٠ مشترك.">
   <meta property="og:image" content="assets/hero-team.webp">
   <meta property="og:locale" content="ar_AR">
   <meta name="theme-color" content="#101113">
   <link rel="icon" href="assets/azm-logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;700;800;900&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/hero-team.webp" type="image/webp">
+  <script>document.documentElement.classList.add('js');</script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <a class="skip" href="#main">تخطَّ إلى المحتوى</a>
-
-  <div class="demo-bar" role="note">
-    <span class="demo-dot" aria-hidden="true"></span>
-    معاينة تصميم — الأعمار والأنشطة والأسماء المعروضة <strong>بيانات تجريبية</strong> حتى اعتمادها.
-  </div>
+  <div class="progress" aria-hidden="true"><span></span></div>
 
   <header class="site-header">
     <div class="wrap header-row">
@@ -35,13 +32,14 @@
       <nav class="main-nav" id="main-nav" aria-label="التنقل الرئيسي">
         <ul>
           <li><a href="#about">عن عزم</a></li>
-          <li><a href="#programs">البرامج</a></li>
+          <li><a href="#offer">الاشتراك والمواعيد</a></li>
+          <li><a href="#gallery">الصور والفيديو</a></li>
           <li><a href="#activities">الأنشطة</a></li>
           <li><a href="#contact">تواصل معنا</a></li>
         </ul>
         <div class="nav-actions">
           <a class="btn btn-ghost" href="#login">تسجيل الدخول</a>
-          <a class="btn btn-gold" href="#join">سجّل ابنك</a>
+          <a class="btn btn-gold" href="#offer" data-register>سجّل ابنك</a>
         </div>
       </nav>
 
@@ -56,130 +54,81 @@
     <!-- الواجهة الأولى -->
     <section class="hero" id="top" aria-labelledby="hero-title">
       <div class="wrap hero-grid">
-        <div class="hero-copy reveal">
-          <img class="hero-logo" src="assets/azm-logo.webp" alt="شعار أكاديمية عزم لكرة القدم AZM FC" width="120" height="133">
-          <p class="eyebrow">أكاديمية عزم لكرة القدم</p>
-          <h1 id="hero-title">مهارة في الملعب،<br><span>وقيم في الحياة</span></h1>
-          <p class="lead">تدريب كرة قدم ينمّي مهارات ابنك ويعلّمه الانضباط والاحترام وروح الفريق.</p>
-          <div class="hero-actions">
-            <a class="btn btn-gold btn-lg" href="#join">سجّل ابنك</a>
-            <a class="btn btn-outline btn-lg" href="#programs">اكتشف البرامج</a>
+        <div class="hero-copy" data-hero-copy>
+          <img class="hero-logo reveal" src="assets/azm-logo.webp" alt="شعار أكاديمية عزم لكرة القدم AZM FC" width="120" height="133">
+          <p class="eyebrow reveal" style="--d:.05s">أكاديمية عزم لكرة القدم · حي الزهراء</p>
+          <h1 id="hero-title" class="reveal" style="--d:.1s">مهارة في الملعب،<br><span>وقيم في الحياة</span></h1>
+          <p class="lead reveal" style="--d:.18s">تدريب كرة قدم ينمّي مهارات ابنك ويعلّمه الانضباط والاحترام وروح الفريق.</p>
+          <div class="hero-actions reveal" style="--d:.26s">
+            <a class="btn btn-gold btn-lg" href="#offer" data-register>سجّل ابنك</a>
+            <a class="btn btn-outline btn-lg" href="#offer">الاشتراك والمواعيد</a>
           </div>
-          <ul class="hero-points" aria-label="ما يميز عزم">
-            <li>مهارات الكرة</li>
-            <li>العمل الجماعي</li>
-            <li>متابعة ولي الأمر</li>
-          </ul>
+          <a class="offer-pill reveal" style="--d:.34s" href="#offer">
+            <span class="pill-tag">عرض التأسيس</span>
+            <span><b>٢٩٩ ريال</b> بدل <s>٤٧٥</s> لأول ٢٠ مشترك</span>
+          </a>
         </div>
-        <figure class="hero-media reveal">
-          <img src="assets/hero-team.webp" width="720" height="1280"
+        <figure class="hero-media reveal" data-reveal="clip" style="--d:.15s">
+          <img src="assets/hero-team.webp" width="720" height="1280" data-parallax="-0.08" data-scale="1.12"
                alt="لاعبون صغار بزي عزم الأسود والذهبي يتدربون على المراوغة بين الأقماع عند الغروب">
         </figure>
       </div>
+      <a class="scroll-cue" href="#offer" aria-label="انزل إلى الاشتراك والمواعيد"><span></span></a>
     </section>
 
-    <!-- برامج التدريب -->
-    <section class="section light" id="programs" aria-labelledby="programs-title">
+    <!-- الاشتراك والمواعيد -->
+    <section class="section offer-section" id="offer" aria-labelledby="offer-title">
       <div class="wrap">
-        <div class="section-head">
-          <p class="kicker">برامج التدريب</p>
-          <h2 id="programs-title">برنامج يناسب عمر ابنك ومستواه</h2>
-          <p>اختر البرنامج المناسب، أو اطلب منا اقتراح المجموعة الأنسب لابنك.</p>
+        <div class="section-head reveal">
+          <p class="kicker">الاشتراك والمواعيد</p>
+          <h2 id="offer-title">انضم مع أول ٢٠ مشترك بسعر التأسيس</h2>
         </div>
 
-        <div class="cards programs">
-          <article class="card program">
-            <div class="program-top">
-              <span class="age">٥ – ٧ سنوات <em class="demo-tag">تجريبي</em></span>
-              <span class="status status-open">التسجيل مفتوح</span>
+        <div class="offer-grid">
+          <article class="price-card reveal" data-reveal="zoom">
+            <div class="price-badge">عرض التأسيس</div>
+            <p class="price-label">قيمة الاشتراك</p>
+            <p class="price">
+              <span class="price-now"><b data-count="299">٢٩٩</b> <small>ريال</small></span>
+              <span class="price-was">بدل <s>٤٧٥ ريال</s></span>
+            </p>
+            <p class="price-save">وفّر ١٧٦ ريال</p>
+            <div class="seats">
+              <div class="seats-row" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <p>العرض متاح <b>لأول ٢٠ مشترك فقط</b>، وبعدها يعود الاشتراك إلى ٤٧٥ ريال.</p>
             </div>
-            <h3>البراعم</h3>
-            <p>حب الكرة أولًا: التوازن والتحكم بالكرة من خلال اللعب، وتعلّم الالتزام بالدور والتعليمات.</p>
-            <dl class="facts">
-              <div><dt>المواعيد</dt><dd>تُعلن المواعيد قريبًا</dd></div>
-              <div><dt>المكان</dt><dd>ملعب عزم</dd></div>
-              <div><dt>الاشتراك</dt><dd>استفسر عن الاشتراك</dd></div>
-            </dl>
-            <a class="btn btn-dark btn-block" href="#join" aria-label="تفاصيل برنامج البراعم">تفاصيل البرنامج</a>
+            <a class="btn btn-gold btn-lg btn-block" href="#offer" data-register>احجز مكان ابنك الآن</a>
           </article>
 
-          <article class="card program featured">
-            <div class="program-top">
-              <span class="age">٨ – ١١ سنة <em class="demo-tag">تجريبي</em></span>
-              <span class="status status-open">التسجيل مفتوح</span>
-            </div>
-            <h3>الناشئون</h3>
-            <p>بناء المهارات الأساسية: التمرير والاستلام والتسديد، مع فهم اللعب الجماعي ومراكز الملعب.</p>
-            <dl class="facts">
-              <div><dt>المواعيد</dt><dd>تُعلن المواعيد قريبًا</dd></div>
-              <div><dt>المكان</dt><dd>ملعب عزم</dd></div>
-              <div><dt>الاشتراك</dt><dd>استفسر عن الاشتراك</dd></div>
-            </dl>
-            <a class="btn btn-dark btn-block" href="#join" aria-label="تفاصيل برنامج الناشئين">تفاصيل البرنامج</a>
-          </article>
+          <div class="info-stack">
+            <article class="info-card reveal" style="--d:.08s">
+              <h3><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>مواعيد التدريب</h3>
+              <ul class="schedule">
+                <li><span class="day">السبت</span><span class="time">٧:٠٠ – ٨:٣٠ مساءً</span></li>
+                <li><span class="day">الثلاثاء</span><span class="time">٧:٠٠ – ٨:٣٠ مساءً</span></li>
+                <li><span class="day">الخميس</span><span class="time">٦:٠٠ – ٧:٣٠ مساءً</span></li>
+              </ul>
+              <p class="note">٣ حصص أسبوعيًا، مدة كل حصة ساعة ونصف.</p>
+            </article>
 
-          <article class="card program">
-            <div class="program-top">
-              <span class="age">١٢ – ١٤ سنة <em class="demo-tag">تجريبي</em></span>
-              <span class="status status-wait">قائمة انتظار</span>
-            </div>
-            <h3>الأشبال</h3>
-            <p>تطوير الأداء: التكتيك والقرار السريع واللياقة، مع مسؤولية القيادة داخل الفريق وخارجه.</p>
-            <dl class="facts">
-              <div><dt>المواعيد</dt><dd>تُعلن المواعيد قريبًا</dd></div>
-              <div><dt>المكان</dt><dd>ملعب عزم</dd></div>
-              <div><dt>الاشتراك</dt><dd>استفسر عن الاشتراك</dd></div>
-            </dl>
-            <a class="btn btn-dark btn-block" href="#join" aria-label="تفاصيل برنامج الأشبال">تفاصيل البرنامج</a>
-          </article>
-        </div>
-      </div>
-    </section>
+            <article class="info-card reveal" style="--d:.16s">
+              <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="2.6" fill="currentColor"/></svg>مكان التدريب</h3>
+              <p class="place">حي الزهراء</p>
+              <p class="note">رابط الموقع على الخرائط يُضاف قريبًا.</p>
+            </article>
 
-    <!-- من داخل عزم -->
-    <section class="section" id="activities" aria-labelledby="activities-title">
-      <div class="wrap">
-        <div class="section-head row">
-          <div>
-            <p class="kicker">من داخل عزم</p>
-            <h2 id="activities-title">أحدث الأنشطة</h2>
+            <article class="info-card reveal" style="--d:.24s">
+              <h3><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3h3l1.6 4.2-2 1.4a12 12 0 0 0 6.2 6.2l1.4-2L21 14.4v3A2.6 2.6 0 0 1 18.4 20 15.4 15.4 0 0 1 4 5.6 2.6 2.6 0 0 1 6.6 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>للاستفسار</h3>
+              <p class="place"><a href="tel:+966553461701" dir="ltr">055 346 1701</a></p>
+              <div class="contact-btns">
+                <a class="btn btn-dark" href="tel:+966553461701">اتصل الآن</a>
+                <a class="btn btn-wa" href="https://wa.me/966553461701" target="_blank" rel="noopener">واتساب</a>
+              </div>
+            </article>
           </div>
-          <a class="link-more" href="#activities">كل الأنشطة <span aria-hidden="true">←</span></a>
-        </div>
-
-        <div class="cards activities">
-          <article class="card activity">
-            <div class="activity-cover cover-training" aria-hidden="true">
-              <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="16" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 14l7 5-3 8h-8l-3-8z" fill="currentColor"/></svg>
-            </div>
-            <div class="activity-body">
-              <p class="meta"><span class="cat">تدريبات</span><time datetime="2026-11-15">١٥ نوفمبر ٢٠٢٦</time><em class="demo-tag">تجريبي</em></p>
-              <h3>حصة مهارات المراوغة</h3>
-              <p>تمارين التحكم بالكرة بين الأقماع، وتحدي السرعة مع الحفاظ على الدقة.</p>
-            </div>
-          </article>
-
-          <article class="card activity">
-            <div class="activity-cover cover-match" aria-hidden="true">
-              <svg viewBox="0 0 48 48"><rect x="8" y="12" width="32" height="24" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M24 12v24M8 20h5v8H8M40 20h-5v8h5" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
-            </div>
-            <div class="activity-body">
-              <p class="meta"><span class="cat">مباريات</span><time datetime="2026-11-08">٨ نوفمبر ٢٠٢٦</time><em class="demo-tag">تجريبي</em></p>
-              <h3>مباراة ودية للناشئين</h3>
-              <p>أول تجربة لعب جماعي للمجموعة الجديدة، وتطبيق ما تعلموه في الحصص.</p>
-            </div>
-          </article>
-
-          <article class="card activity">
-            <div class="activity-cover cover-values" aria-hidden="true">
-              <svg viewBox="0 0 48 48"><path d="M24 38s-13-7.5-13-17a7 7 0 0 1 13-3.6A7 7 0 0 1 37 21c0 9.5-13 17-13 17z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>
-            </div>
-            <div class="activity-body">
-              <p class="meta"><span class="cat">أنشطة تربوية</span><time datetime="2026-11-01">١ نوفمبر ٢٠٢٦</time><em class="demo-tag">تجريبي</em></p>
-              <h3>يوم الروح الرياضية</h3>
-              <p>نشاط عن احترام الزميل والحكم والمنافس، وتكريم اللاعب الأكثر التزامًا.</p>
-            </div>
-          </article>
         </div>
       </div>
     </section>
@@ -187,27 +136,27 @@
     <!-- طريقتنا في التدريب -->
     <section class="section dark" id="about" aria-labelledby="method-title">
       <div class="wrap method-grid">
-        <figure class="method-media">
-          <img src="assets/training-player.webp" width="720" height="1280" loading="lazy" decoding="async"
+        <figure class="method-media reveal" data-reveal="clip">
+          <img src="assets/training-player.webp" width="720" height="1280" loading="lazy" decoding="async" data-parallax="0.1" data-scale="1.18"
                alt="لاعب من عزم يضع قدمه على الكرة ويتطلع إلى زملائه في الملعب تحت الأضواء">
         </figure>
         <div class="method-copy">
-          <p class="kicker">طريقتنا في التدريب</p>
-          <h2 id="method-title">نبني اللاعب والإنسان معًا</h2>
+          <p class="kicker reveal">طريقتنا في التدريب</p>
+          <h2 id="method-title" class="reveal" style="--d:.05s">نبني اللاعب والإنسان معًا</h2>
           <ol class="pillars">
-            <li>
+            <li class="reveal" style="--d:.1s">
               <h3>مهارات الكرة</h3>
               <p>تمارين متدرجة للتحكم والتمرير والتسديد تناسب عمر اللاعب ومستواه.</p>
             </li>
-            <li>
+            <li class="reveal" style="--d:.18s">
               <h3>العمل الجماعي</h3>
               <p>يتعلم اللاعب أن ينجح مع فريقه: يمرر، يساند، ويحتفل بنجاح زميله.</p>
             </li>
-            <li>
+            <li class="reveal" style="--d:.26s">
               <h3>الانضباط والاحترام</h3>
               <p>الحضور في الموعد، احترام المدرب والزميل والمنافس، والالتزام بقواعد الملعب.</p>
             </li>
-            <li>
+            <li class="reveal" style="--d:.34s">
               <h3>متابعة ولي الأمر</h3>
               <p>حساب لولي الأمر يعرض الحصص والحضور وملاحظات المدرب وخطوة التطوير القادمة.</p>
             </li>
@@ -216,26 +165,68 @@
       </div>
     </section>
 
-    <!-- فريق التدريب (نصي) -->
-    <section class="section light" aria-labelledby="coaches-title">
+    <!-- الصور والفيديوهات -->
+    <section class="section gallery-section" id="gallery" aria-labelledby="gallery-title">
       <div class="wrap">
-        <div class="section-head">
+        <div class="section-head reveal">
+          <p class="kicker">الصور والفيديوهات</p>
+          <h2 id="gallery-title">لقطات من عزم</h2>
+        </div>
+
+        <div class="gallery">
+          <button class="shot shot-tall reveal" data-reveal="clip" type="button" data-full="assets/hero-team.webp" aria-label="عرض الصورة: تدريب المراوغة بين الأقماع">
+            <img src="assets/hero-team.webp" width="720" height="1280" loading="lazy" decoding="async" data-parallax="-0.06" data-scale="1.15" alt="لاعبون بزي عزم يتدربون على المراوغة بين الأقماع">
+            <span class="shot-cap">تدريب المراوغة</span>
+          </button>
+          <button class="shot shot-wide reveal" data-reveal="clip" style="--d:.1s" type="button" data-full="assets/training-venue.webp" aria-label="عرض الصورة: ملعب التدريب">
+            <img src="assets/training-venue.webp" width="1200" height="798" loading="lazy" decoding="async" data-parallax="0.06" data-scale="1.15" alt="ملعب نجيل صناعي بخطوط بيضاء ودائرة منتصف">
+            <span class="shot-cap">ملعب التدريب</span>
+          </button>
+          <button class="shot shot-player reveal" data-reveal="clip" style="--d:.18s" type="button" data-full="assets/training-player.webp" aria-label="عرض الصورة: لاعب عزم في الملعب">
+            <img src="assets/training-player.webp" width="720" height="1280" loading="lazy" decoding="async" data-parallax="-0.05" data-scale="1.15" alt="لاعب من عزم يضع قدمه على الكرة">
+            <span class="shot-cap">جاهز للحصة</span>
+          </button>
+          <div class="shot shot-video reveal" data-reveal="clip" style="--d:.26s">
+            <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></svg></span>
+            <b>الفيديوهات</b>
+            <span>قريبًا</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- أحدث الأنشطة -->
+    <section class="section light" id="activities" aria-labelledby="activities-title">
+      <div class="wrap">
+        <div class="soon reveal" data-reveal="zoom">
+          <p class="kicker">من داخل عزم</p>
+          <h2 id="activities-title">أحدث الأنشطة</h2>
+          <p class="soon-badge">قريبًا</p>
+          <p>هنا ستجد أخبار التدريبات والمباريات والبطولات والأنشطة التربوية بعد انطلاق الأكاديمية.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- فريق التدريب (نصي) -->
+    <section class="section" aria-labelledby="coaches-title">
+      <div class="wrap">
+        <div class="section-head reveal">
           <p class="kicker">فريق التدريب</p>
           <h2 id="coaches-title">مدربون يعرفون كيف يعلّمون الصغار</h2>
           <p>تُضاف الأسماء والخبرات بعد اعتمادها.</p>
         </div>
         <ul class="coaches">
-          <li class="coach">
+          <li class="coach reveal">
             <span class="role">المدير الفني</span>
             <b>يُعلن الاسم قريبًا</b>
-            <p>يضع منهج التدريب لكل فئة عمرية ويتابع تطور المجموعات.</p>
+            <p>يضع منهج التدريب لكل فئة عمرية ويتابع تطور اللاعبين.</p>
           </li>
-          <li class="coach">
+          <li class="coach reveal" style="--d:.08s">
             <span class="role">مدرب الفئات السنية</span>
             <b>يُعلن الاسم قريبًا</b>
-            <p>يقود الحصص اليومية ويسجل الحضور وتقييمات المهارة والسلوك.</p>
+            <p>يقود الحصص ويسجل الحضور وتقييمات المهارة والسلوك.</p>
           </li>
-          <li class="coach">
+          <li class="coach reveal" style="--d:.16s">
             <span class="role">مدرب حراس المرمى</span>
             <b>يُعلن الاسم قريبًا</b>
             <p>تدريب متخصص للحراس على التمركز والإمساك والتوزيع.</p>
@@ -245,39 +236,39 @@
     </section>
 
     <!-- الملعب والأسئلة -->
-    <section class="section" id="venue" aria-labelledby="venue-title">
+    <section class="section light" id="venue" aria-labelledby="venue-title">
       <div class="wrap venue-grid">
         <div class="venue">
-          <p class="kicker">أين نتدرب؟</p>
-          <h2 id="venue-title">ملعب عزم</h2>
-          <figure class="venue-media">
-            <img src="assets/training-venue.webp" width="1200" height="798" loading="lazy" decoding="async"
+          <p class="kicker reveal">أين نتدرب؟</p>
+          <h2 id="venue-title" class="reveal">حي الزهراء</h2>
+          <figure class="venue-media reveal" data-reveal="clip">
+            <img src="assets/training-venue.webp" width="1200" height="798" loading="lazy" decoding="async" data-parallax="0.07" data-scale="1.15"
                  alt="ملعب نجيل صناعي بخطوط بيضاء ودائرة منتصف، تحيط به مدرجات ملونة ومظلة">
           </figure>
-          <p class="venue-note">العنوان ورابط الخرائط يُعلنان بعد اعتمادهما.</p>
+          <p class="venue-note">رابط الموقع على الخرائط يُضاف قريبًا.</p>
         </div>
 
-        <div class="faq" aria-labelledby="faq-title">
-          <h2 id="faq-title" class="faq-title">أسئلة شائعة</h2>
+        <div class="faq reveal" style="--d:.1s">
+          <h2 class="faq-title">أسئلة شائعة</h2>
           <details>
-            <summary>ما الأعمار التي تقبلها الأكاديمية؟</summary>
-            <p>نستقبل عدة فئات عمرية، وتُعلن الفئات المعتمدة مع كل برنامج. إن لم تجد الفئة المناسبة، اطلب اقتراح مجموعة في نموذج التسجيل.</p>
+            <summary>كم قيمة الاشتراك؟</summary>
+            <p>قيمة الاشتراك ٤٧٥ ريال، ومع عرض التأسيس تصبح ٢٩٩ ريال لأول ٢٠ مشترك فقط.</p>
           </details>
           <details>
             <summary>ما مواعيد التدريب؟</summary>
-            <p>تُعلن المواعيد قريبًا لكل مجموعة، وتظهر لولي الأمر في حسابه بعد قبول الطلب.</p>
+            <p>السبت والثلاثاء من ٧:٠٠ إلى ٨:٣٠ مساءً، والخميس من ٦:٠٠ إلى ٧:٣٠ مساءً.</p>
           </details>
           <details>
-            <summary>هل يوجد زي رسمي؟</summary>
-            <p>نعم، للأكاديمية زي باللونين الأسود والذهبي. تفاصيل الحصول عليه تُرسل مع تأكيد التسجيل.</p>
+            <summary>أين مكان التدريب؟</summary>
+            <p>في حي الزهراء، وسنضيف رابط الموقع على الخرائط قريبًا.</p>
+          </details>
+          <details>
+            <summary>ما الأعمار التي تقبلها الأكاديمية؟</summary>
+            <p>تواصل معنا على <a href="tel:+966553461701" dir="ltr">055 346 1701</a> لمعرفة الفئات العمرية المتاحة والمجموعة المناسبة لابنك.</p>
           </details>
           <details>
             <summary>كيف أسجّل ابني؟</summary>
-            <p>اضغط «سجّل ابنك»، واختر البرنامج، وأدخل بياناتك وبيانات اللاعب الأساسية. ستصلك رسالة تأكيد برقم متابعة، ثم نتواصل معك بعد مراجعة الطلب.</p>
-          </details>
-          <details>
-            <summary>كيف يتم تجديد الاشتراك؟</summary>
-            <p>تظهر حالة الاشتراك وموعد التجديد في حساب ولي الأمر. للاستفسار عن الاشتراك تواصل معنا.</p>
+            <p>اضغط «سجّل ابنك» وأكمل نموذج التسجيل، وسنتواصل معك لتأكيد الاشتراك.</p>
           </details>
         </div>
       </div>
@@ -285,13 +276,15 @@
 
     <!-- دعوة أخيرة -->
     <section class="cta" id="join" aria-labelledby="cta-title">
-      <div class="wrap cta-inner">
+      <div class="wrap cta-inner reveal" data-reveal="zoom">
+        <p class="cta-offer">عرض التأسيس: <b>٢٩٩ ريال</b> بدل <s>٤٧٥</s></p>
         <h2 id="cta-title">جاهز يبدأ ابنك رحلته مع عزم؟</h2>
-        <p>سجّل اهتمامك الآن، وسنتواصل معك لاختيار المجموعة المناسبة.</p>
+        <p>المقاعد محدودة لأول ٢٠ مشترك. سجّل الآن واحجز مكانه.</p>
         <div class="hero-actions center">
-          <a class="btn btn-gold btn-lg" href="#join">سجّل ابنك</a>
-          <a class="btn btn-outline btn-lg" href="#contact">تواصل معنا</a>
+          <a class="btn btn-gold btn-lg" href="#offer" data-register>سجّل ابنك</a>
+          <a class="btn btn-outline btn-lg" href="https://wa.me/966553461701" target="_blank" rel="noopener">تواصل عبر واتساب</a>
         </div>
+        <p class="cta-phone">أو اتصل بنا: <a href="tel:+966553461701" dir="ltr">055 346 1701</a></p>
       </div>
     </section>
   </main>
@@ -306,14 +299,18 @@
         <h2>الأكاديمية</h2>
         <ul>
           <li><a href="#about">عن عزم</a></li>
-          <li><a href="#programs">البرامج</a></li>
-          <li><a href="#activities">الأنشطة</a></li>
-          <li><a href="#join">سجّل ابنك</a></li>
+          <li><a href="#offer">الاشتراك والمواعيد</a></li>
+          <li><a href="#gallery">الصور والفيديو</a></li>
+          <li><a href="#offer" data-register>سجّل ابنك</a></li>
         </ul>
       </nav>
       <div id="login">
         <h2>تواصل معنا</h2>
-        <p class="muted">قنوات التواصل الرسمية تُضاف بعد اعتمادها.</p>
+        <ul class="contact-list">
+          <li><a href="tel:+966553461701"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3h3l1.6 4.2-2 1.4a12 12 0 0 0 6.2 6.2l1.4-2L21 14.4v3A2.6 2.6 0 0 1 18.4 20 15.4 15.4 0 0 1 4 5.6 2.6 2.6 0 0 1 6.6 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span dir="ltr">055 346 1701</span></a></li>
+          <li><a href="https://wa.me/966553461701" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-4A8 8 0 1 1 8 18.7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>واتساب</a></li>
+          <li><span class="loc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="10" r="2.4" fill="currentColor"/></svg>حي الزهراء</span></li>
+        </ul>
         <a class="btn btn-ghost" href="#login">تسجيل الدخول</a>
       </div>
     </div>
@@ -322,6 +319,11 @@
       <small>سياسة الخصوصية والشروط تُضاف قريبًا</small>
     </div>
   </footer>
+
+  <dialog class="lightbox" aria-label="عرض الصورة">
+    <button class="lightbox-close" type="button" aria-label="إغلاق">×</button>
+    <img src="" alt="">
+  </dialog>
 
   <script src="main.js" defer></script>
 </body>
