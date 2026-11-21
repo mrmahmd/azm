@@ -496,3 +496,8 @@ button { font: inherit; }
   .venue-grid { grid-template-columns: 1fr 1fr; gap: 64px; align-items: start; }
   .cta { padding: 112px 0; }
 }
+
+/* زر الخريطة */
+.btn-map { margin-top: 14px; }
+.btn-map svg { width: 18px; height: 18px; flex: none; }
+.venue-map { width: 100%; justify-content: center; }
