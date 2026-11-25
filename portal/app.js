@@ -330,10 +330,21 @@
     });
   }
 
+  function normalizeActivationCode(code) {
+    return code.toUpperCase()
+      .replace(/[\s\u061c\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069]/g, '')
+      .replace(/[\u2010-\u2015\u2212\uff0d]/g, '-')
+      .replace(/[\u0660-\u0669\u06f0-\u06f9]/g, function (digit) {
+        var zero = digit <= '\u0669' ? '\u0660' : '\u06f0';
+        return String(digit.charCodeAt(0) - zero.charCodeAt(0));
+      })
+      .replace(/^AZM-?([A-Z0-9]{6})-?([A-Z0-9]{4})$/, 'AZM-$1-$2');
+  }
+
   function bindActivate() {
     $('activate-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      var code = val('a-code').toUpperCase(), btn = $('a-submit');
+      var code = normalizeActivationCode(val('a-code')), btn = $('a-submit');
       setError('a-error');
       if (!code) return setError('a-error', 'اكتب رمز التفعيل.');
       busy(btn, true, 'نتحقق…');
