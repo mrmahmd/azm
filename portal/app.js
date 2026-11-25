@@ -3,6 +3,9 @@
   'use strict';
 
   var C = window.AZM_CONFIG;
+  // صفحتان منفصلتان: /portal لأولياء الأمور و /staff للطاقم
+  var MODE = window.AZM_MODE === 'staff' ? 'staff' : 'parent';
+  var OTHER_PAGE = MODE === 'staff' ? '../portal/' : '../staff/';
   var sb = window.supabase.createClient(C.supabaseUrl, C.supabaseKey, { auth: { persistSession: true, autoRefreshToken: true } });
   var LOGO = '../assets/azm-logo.webp';
   var WA = 'https://wa.me/' + C.academyWhatsapp;
@@ -141,13 +144,16 @@
 
   /* ---------- الشاشات ---------- */
   function viewLogin() {
-    return card(head(null, '', 'بوابة أكاديمية عزم', 'لأولياء الأمور والطاقم') +
+    var staff = MODE === 'staff';
+    return card(head(null, '', staff ? 'بوابة طاقم عزم' : 'بوابة أولياء الأمور', staff ? 'للمدرب والمشرفين والدعم الفني' : 'تابع اشتراك ابنك وحضوره وتقاريره') +
       '<form id="login-form" class="form-grid" novalidate><div class="field"><label for="u">اسم المستخدم</label><input id="u" dir="ltr" autocomplete="username" autocapitalize="none" spellcheck="false"></div>' +
       '<div class="field"><label for="p">كلمة المرور</label><input id="p" type="password" dir="ltr" autocomplete="current-password"></div>' +
       '<p class="form-error" id="l-error" role="alert"></p><button class="btn btn-gold btn-block">دخول</button></form>' +
-      '<div class="auth-links"><a class="btn btn-ghost btn-block" href="#signup">ولي أمر جديد؟ أنشئ حسابك</a><a class="btn btn-ghost btn-block" href="#activate">من الطاقم؟ فعّل حسابك برمز التفعيل</a></div>' +
-      '<p class="auth-help">نسيت كلمة المرور؟ <a href="' + WA + '" target="_blank" rel="noopener">تواصل معنا</a> ونعيد تعيينها لك.</p>' +
-      '<a class="back-home" href="../">← الموقع الرئيسي</a>');
+      '<div class="auth-links">' + (staff
+        ? '<a class="btn btn-ghost btn-block" href="#activate">أول مرة؟ فعّل حسابك برمز التفعيل</a>'
+        : '<a class="btn btn-ghost btn-block" href="#signup">ولي أمر جديد؟ أنشئ حسابك</a>') + '</div>' +
+      '<p class="auth-help">نسيت كلمة المرور؟ ' + (staff ? 'تواصل مع الدعم الفني ويعيد تعيينها لك.' : '<a href="' + WA + '" target="_blank" rel="noopener">تواصل معنا</a> ونعيد تعيينها لك.') + '</p>' +
+      (staff ? '' : '<a class="back-home" href="../">← الموقع الرئيسي</a>'));
   }
   function viewSignup() {
     return card(head(null, '', 'إنشاء حساب ولي أمر', 'بعد الإرسال يراجع المدرب طلبك ويفعّل حسابك.') +
@@ -217,6 +223,13 @@
     return sb.from('profiles').select('*').eq('id', session.user.id).single().then(function (r) {
       if (r.error) throw r.error;
       profile = r.data;
+      // كل واحد يستخدم صفحته: الطاقم من /staff وأولياء الأمور من /portal
+      if (MODE === 'parent' && profile.role !== 'parent') {
+        show(card(head(null, '', 'هذي صفحة أولياء الأمور', 'حسابك من الطاقم، فادخل من صفحة الطاقم.') + '<a class="btn btn-gold btn-block" href="' + OTHER_PAGE + '">افتح صفحة الطاقم</a>' + logoutLink())); return;
+      }
+      if (MODE === 'staff' && profile.role === 'parent') {
+        show(card(head(null, '', 'هذي صفحة الطاقم', 'حسابك ليس مربوطًا بدور في الطاقم. لو أنت ولي أمر، ادخل من صفحة أولياء الأمور، ولو معك رمز تفعيل تواصل مع الدعم الفني.') + '<a class="btn btn-gold btn-block" href="' + OTHER_PAGE + '">صفحة أولياء الأمور</a>' + logoutLink())); return;
+      }
       if (profile.role !== 'parent') {
         if (profile.status === 'disabled') { show(card(head(null, '', 'الحساب معطّل', 'تواصل مع الدعم الفني.') + logoutLink())); return; }
         if (profile.status === 'active' && (profile.role === 'coach' || profile.role === 'support')) return loadCoachRequests();
@@ -247,9 +260,9 @@
       if (h === 'firstuse' && activation) { show(viewFirstUse()); bindFirstUse(); return; }
       routeSignedIn(); return;
     }
-    if (h === 'signup') { kidCount = 1; show(viewSignup()); bindSignup(); }
-    else if (h === 'activate') { show(viewActivate()); bindActivate(); }
-    else if (h === 'firstuse' && activation) { show(viewFirstUse()); bindFirstUse(); }
+    if (h === 'signup' && MODE === 'parent') { kidCount = 1; show(viewSignup()); bindSignup(); }
+    else if (h === 'activate' && MODE === 'staff') { show(viewActivate()); bindActivate(); }
+    else if (h === 'firstuse' && activation && MODE === 'staff') { show(viewFirstUse()); bindFirstUse(); }
     else { show(viewLogin()); bindLogin(); }
   }
 
