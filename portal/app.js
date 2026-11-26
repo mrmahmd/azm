@@ -229,7 +229,7 @@
   }
   function viewOrderStep() {
     return card(head(null, '', regTitle(), 'اكتب رقم طلب سلة، ونتأكد إنه مسجّل عندنا.') +
-      '<form id="order-form" class="form-grid" novalidate><div class="field"><label for="o-order">رقم طلب سلة</label><input id="o-order" dir="ltr" inputmode="numeric" autocomplete="off" placeholder="مثال: 48777" value="' + esc(reg.order || '') + '"><span class="hint">تلقاه في رسالة تأكيد الطلب من سلة.</span></div>' +
+      '<form id="order-form" class="form-grid" novalidate><div class="field"><label for="o-order">رقم طلب سلة</label><span class="paste-row"><input id="o-order" type="text" dir="ltr" autocomplete="off" spellcheck="false" placeholder="مثال: 48777" value="' + esc(reg.order || '') + '"><button type="button" class="btn btn-ghost btn-sm" data-paste-order>لصق</button></span><span class="hint">تلقاه في رسالة تأكيد الطلب من سلة، وتقدر تنسخه وتلصقه هنا.</span></div>' +
       '<div id="o-result" role="alert"></div><button class="btn btn-gold btn-block" id="o-submit">تحقق من الرقم</button></form>' +
       '<p class="auth-help"><a href="#" data-reg-step="method">← رجوع</a></p>' + regFoot());
   }
@@ -384,6 +384,13 @@
   }
 
   function bindOrderStep() {
+    var input = $('o-order');
+    // اللصق من رسالة سلة: نترك الأرقام بس
+    input.addEventListener('input', function () { var c = normOrder(input.value); if (c !== input.value) input.value = c; });
+    document.querySelector('[data-paste-order]').addEventListener('click', function () {
+      if (!navigator.clipboard || !navigator.clipboard.readText) { input.focus(); toast('اضغط مطوّلًا على الخانة واختر لصق'); return; }
+      navigator.clipboard.readText().then(function (t) { input.value = normOrder(t); input.focus(); }, function () { input.focus(); toast('اضغط مطوّلًا على الخانة واختر لصق'); });
+    });
     $('order-form').addEventListener('submit', function (e) {
       e.preventDefault();
       var order = normOrder(val('o-order')), btn = $('o-submit'), box = $('o-result');

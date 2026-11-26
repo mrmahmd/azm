@@ -73,3 +73,11 @@
 .salla-add > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .salla-add input { width: min(100%, 260px); font-size: 1.05rem; letter-spacing: .04em; }
 .support-note { color: var(--text-soft); font-size: .84rem; line-height: 1.7; }
+.salla-add-title { font-weight: 800; }
+.salla-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.salla-fields label { display: block; font-size: .84rem; color: var(--text-soft); margin-bottom: 4px; }
+.salla-input { display: flex; gap: 6px; align-items: center; }
+.salla-input input { flex: 1; width: auto; min-width: 0; }
+.salla-add > .btn-gold { justify-self: start; }
+.salla-phone { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.salla-wa-preview { white-space: pre-wrap; line-height: 1.8; font-size: .88rem; padding: 12px 14px; border-radius: 12px; background: #1f3b2b; border: 1px solid #2fd37a33; }

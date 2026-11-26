@@ -24,7 +24,7 @@
   const areas = {
     profiles: ['الحسابات', 'created_at', 'username', { full_name: 'الاسم', username: 'اسم المستخدم', role: 'الدور', status: 'الحالة', phone: 'الجوال', locked_until: 'مقفل إلى', failed_logins: 'محاولات فاشلة', last_login_at: 'آخر دخول', created_at: 'تاريخ الإنشاء', must_complete_profile: 'الملف غير مكتمل' }],
     activation_codes: ['رموز التفعيل', 'created_at', 'label', { label: 'صاحب الدعوة', role: 'الدور', state: 'الحالة', expires_at: 'تنتهي في', sections: 'الأقسام', used_at: 'تاريخ الاستخدام', used_by: 'الحساب المستخدم', revoked_at: 'تاريخ الإلغاء', created_at: 'تاريخ الإنشاء' }],
-    salla_orders: ['أرقام طلبات سلة', 'created_at', 'order_no', { order_no: 'رقم الطلب', status: 'الحالة', claimed_by: 'سجّل به', created_at: 'تاريخ الإضافة', claimed_at: 'تاريخ التسجيل', created_by: 'أضافه' }],
+    salla_orders: ['أرقام طلبات سلة', 'created_at', 'order_no', { order_no: 'رقم الطلب', phone: 'جوال المشترك', status: 'الحالة', claimed_by: 'سجّل به', created_at: 'تاريخ الإضافة', claimed_at: 'تاريخ التسجيل', created_by: 'أضافه' }],
     registration_requests: ['طلبات التسجيل', 'created_at', 'salla_order_no', { salla_order_no: 'طلب سلة', parent_id: 'ولي الأمر', payment_method: 'طريقة الدفع', status: 'الحالة', kind: 'النوع', created_at: 'تاريخ الطلب', reject_reason: 'سبب الرفض', reviewed_at: 'راجعه في', reviewed_by: 'راجعه', receipt_path: 'مسار الإيصال' }],
     request_players: ['لاعبو الطلبات', 'request_id,player_id', null, { request_id: 'معرّف الطلب', player_id: 'اللاعب' }],
     players: ['اللاعبون', 'created_at', 'full_name', { full_name: 'اسم اللاعب', member_no: 'رقم العضوية', group_id: 'المجموعة', status: 'الحالة', birth_date: 'الميلاد', parent_id: 'ولي الأمر', health_notes: 'ملاحظات صحية', archived_reason: 'سبب الأرشفة', archived_at: 'تاريخ الأرشفة', created_at: 'تاريخ الإنشاء', photo_path: 'مسار صورة اللاعب' }],
@@ -57,6 +57,25 @@
       .replace(/[٠-٩]/g, d => d.charCodeAt(0) - 0x660)
       .replace(/[۰-۹]/g, d => d.charCodeAt(0) - 0x6f0)
       .replace(/\D/g, '');
+  }
+  function phone(value) {
+    const d = digits(value);
+    if (/^009665\d{8}$/.test(d)) return '0' + d.slice(5);
+    if (/^9665\d{8}$/.test(d)) return '0' + d.slice(3);
+    if (/^5\d{8}$/.test(d)) return '0' + d;
+    return d;
+  }
+  const signupUrl = 'https://azm.sorog.net/portal/#signup';
+  // رسالة الترحيب من الدعم الفني بعد تسجيل رقم طلب سلة
+  function welcomeMessage(order) {
+    return 'السلام عليكم ورحمة الله،\nمعك الدعم الفني لأكاديمية عزم لكرة القدم.\n' +
+      'شكرًا لاشتراكك في الأكاديمية، ونتشرف بانضمام ابنك لنا 🌟\n\n' +
+      'باقي خطوة وحدة: أنشئ حسابك في موقع الأكاديمية من الرابط:\n' + signupUrl + '\n\n' +
+      'اختر «اشتركت من متجر سرج (سلة)»، واكتب رقم الطلب: ' + order + '\nوسجّل برقم جوالك هذا.\n\n' +
+      'بعد ما نفعّل حسابك تقدر تتابع اشتراك ابنك ومواعيد الحصص من حسابك.';
+  }
+  function welcomeLink(order, mobile) {
+    return 'https://wa.me/966' + mobile.slice(1) + '?text=' + encodeURIComponent(welcomeMessage(order));
   }
   const accountActions = {
     suspend: ['إيقاف الحساب', 'يتوقّف دخول صاحب الحساب إلى البوابة، وتُنهى جلساته الحالية.'],
@@ -173,6 +192,11 @@
         const [label, color] = inviteState(row);
         return '<span class="st ' + color + '">' + label + '</span>';
       }
+      if (current.area === 'salla_orders' && key === 'phone') {
+        if (!row.phone) return '—';
+        return '<span class="salla-phone"><bdi dir="ltr">' + escapeHtml(row.phone) + '</bdi>' + (row.status === 'available'
+          ? '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="' + escapeHtml(welcomeLink(row.order_no, row.phone)) + '">واتساب</a>' : '') + '</span>';
+      }
       if (current.area === 'salla_orders' && key === 'status') {
         return row.status === 'available' ? '<span class="st st-ok">متاح للتسجيل</span>' : '<span class="st st-off">مُستخدم</span>';
       }
@@ -227,9 +251,12 @@
       body = heading(title, action);
       if (area === 'salla_orders') {
         body.insertAdjacentHTML('beforebegin', '<form class="support-form salla-add" id="salla-add" data-command="salla_add">' +
-          '<label for="salla-number">أضف رقم طلب من لوحة سلة</label><p class="support-note">اكتب رقم الطلب بعد ما تتأكد إنه مدفوع. ولي الأمر يكتب نفس الرقم وقت التسجيل، والرقم يُستخدم مرة وحدة.</p>' +
-          '<div><input id="salla-number" name="order" inputmode="numeric" dir="ltr" maxlength="24" autocomplete="off" required>' +
-          '<button class="btn btn-gold btn-sm">حفظ الرقم</button></div><p role="alert" class="form-error"></p></form>');
+          '<p class="salla-add-title">أضف رقم طلب من لوحة سلة</p><p class="support-note">اكتب رقم الطلب بعد ما تتأكد إنه مدفوع، وجوال المشترك علشان ترسل له رسالة إنشاء الحساب. ولي الأمر يكتب نفس الرقم وقت التسجيل، والرقم يُستخدم مرة وحدة.</p>' +
+          '<div class="salla-fields"><div><label for="salla-number">رقم الطلب</label><span class="salla-input"><input id="salla-number" name="order" type="text" dir="ltr" autocomplete="off" spellcheck="false" required>' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-paste="salla-number">لصق</button></span></div>' +
+          '<div><label for="salla-phone">جوال المشترك</label><span class="salla-input"><input id="salla-phone" name="phone" type="tel" dir="ltr" autocomplete="off" placeholder="05XXXXXXXX">' +
+          '<button type="button" class="btn btn-ghost btn-sm" data-paste="salla-phone">لصق</button></span></div></div>' +
+          '<button class="btn btn-gold btn-sm">حفظ الرقم</button><p role="alert" class="form-error"></p></form>');
       }
       if (searchKey) {
         const fields = area === 'profiles'
@@ -350,6 +377,14 @@
       if (button.hasAttribute('data-create-invite')) inviteForm();
       if (button.dataset.inviteAction && detailRow) inviteConfirmation(detailRow, button.dataset.inviteAction);
       if (button.dataset.accountAction && detailRow) accountConfirmation(detailRow, button.dataset.accountAction);
+      if (button.dataset.paste) {
+        const field = shell.querySelector('#' + button.dataset.paste);
+        if (!navigator.clipboard?.readText) { field.focus(); toast('اضغط مطوّلًا على الخانة واختر لصق'); return; }
+        navigator.clipboard.readText().then(text => {
+          field.value = button.dataset.paste === 'salla-number' ? digits(text) : phone(text);
+          field.focus();
+        }, () => { field.focus(); toast('ما قدرنا نقرأ الحافظة. اضغط مطوّلًا على الخانة واختر لصق'); });
+      }
       if (button.hasAttribute('data-salla-delete') && detailRow) {
         showDialog('حذف رقم الطلب', '<form class="support-form" data-command="salla_delete" data-target="' + detailRow.id + '">' +
           '<p>يُحذف الرقم <b dir="ltr">' + escapeHtml(detailRow.order_no) + '</b> من القائمة، وما يقدر أحد يسجّل به بعد كذا.</p>' +
@@ -358,6 +393,13 @@
       if (button.hasAttribute('data-support-copy')) {
         const field = dialog.querySelector('#support-secret');
         navigator.clipboard.writeText(field.value).then(() => toast('تم النسخ'), () => { field.focus(); field.select(); });
+      }
+    });
+    // اللصق من رسالة سلة: نترك الأرقام بس، ولو فيها أرقام عربية نحوّلها
+    shell.addEventListener('input', event => {
+      if (event.target.id === 'salla-number') {
+        const clean = digits(event.target.value);
+        if (clean !== event.target.value) event.target.value = clean;
       }
     });
     shell.addEventListener('change', event => {
@@ -379,23 +421,28 @@
       const action = form.dataset.command;
       const id = form.dataset.target;
       const alert = form.querySelector('[role="alert"]');
-      const submit = form.querySelector('button');
+      const submit = form.querySelector('button:not([type="button"])');
       current.pending = submit.disabled = true;
       alert.textContent = '';
       try {
         let response;
         if (action === 'salla_add') {
           const order = digits(input.get('order'));
+          const mobile = phone(input.get('phone'));
           if (!/^\d{3,20}$/.test(order)) { alert.textContent = 'رقم الطلب لازم يكون أرقام فقط (من 3 إلى 20 رقم).'; return; }
-          response = await sb.from('salla_orders').insert({ order_no: order });
+          if (mobile && !/^05\d{8}$/.test(mobile)) { alert.textContent = 'جوال المشترك يبدأ بـ 05 ويتكون من 10 أرقام، أو اتركه فاضي.'; return; }
+          response = await sb.from('salla_orders').insert({ order_no: order, phone: mobile || null });
           if (response.error) {
             alert.textContent = response.error.code === '23505' ? 'الرقم ' + order + ' مسجّل قبل كذا.' : 'تعذّر حفظ الرقم. حاول مرة أخرى.';
             return;
           }
-          toast('تم حفظ رقم الطلب ' + order);
           current.search = '';
           current.page = 0;
           load();
+          if (!mobile) { toast('تم حفظ رقم الطلب ' + order); return; }
+          showDialog('تم حفظ رقم الطلب', '<div class="support-form"><p>رقم الطلب <b dir="ltr">' + order + '</b> صار جاهز للتسجيل. أرسل للمشترك على <bdi dir="ltr">' + mobile + '</bdi> رسالة إنشاء الحساب:</p>' +
+            '<div class="salla-wa-preview">' + escapeHtml(welcomeMessage(order)) + '</div>' +
+            '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + escapeHtml(welcomeLink(order, mobile)) + '">أرسل عبر واتساب</a></div>');
           return;
         }
         if (action === 'salla_delete') {
