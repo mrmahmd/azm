@@ -232,6 +232,9 @@
       }
       if (profile.role !== 'parent') {
         if (profile.status === 'disabled') { show(card(head(null, '', 'الحساب معطّل', 'تواصل مع الدعم الفني.') + logoutLink())); return; }
+        if (profile.status === 'active' && profile.role === 'super_admin' && window.AZM_SUPERVISOR) {
+          return window.AZM_SUPERVISOR.open({ sb: sb, profile: profile, root: $('app') });
+        }
         if (profile.status === 'active' && profile.role === 'support' && window.AZM_SUPPORT) return openSupport();
         if (profile.status === 'active' && (profile.role === 'coach' || profile.role === 'support')) return loadCoachRequests();
         show(viewStaffHome()); return;

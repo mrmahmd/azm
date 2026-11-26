@@ -1,0 +1,71 @@
+.supervisor-shell .side nav { gap: 4px; }
+.supervisor-shell .side nav a { white-space: nowrap; min-width: max-content; }
+.supervisor-shell .side nav a svg { width: 21px; height: 21px; }
+.supervisor-shell .topbar, .super-title, .super-tools {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.supervisor-shell .topbar h1 { font-size: clamp(1.05rem, 3vw, 1.4rem); }
+.supervisor-shell .role-badge { white-space: nowrap; }
+.super-title { margin: 6px 0 14px; }
+.super-title .page-title { margin: 0; }
+.super-title .muted { font-size: .88rem; }
+.super-mode { border: 1px solid var(--line); color: var(--text-soft); padding: 4px 10px; border-radius: 999px; font-size: .83rem; }
+.super-kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, 153px), 1fr)); }
+.super-kpis .kpi span { font-size: .88rem; }
+.super-kpis .kpi strong { display: block; color: var(--c); font-size: clamp(1.2rem, 2.7vw, 1.9rem); line-height: 1.45; }
+.supervisor-shell .card { min-width: 0; }
+.super-chart { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.super-chart li { display: grid; grid-template-columns: minmax(78px, 1.15fr) minmax(52px, 2fr) minmax(26px, auto); gap: 10px; align-items: center; font-size: .86rem; }
+.super-chart li > span:first-child { overflow-wrap: anywhere; }
+.super-chart li > span:last-child { text-align: end; }
+.super-chart .bar { height: 9px; }
+.super-chart .bar i { background: var(--c, var(--gold)); }
+.supervisor-shell .super-tools { justify-content: start; margin-bottom: 14px; }
+.super-tools label { display: grid; gap: 5px; font-size: .86rem; color: var(--text-soft); }
+.super-tools select, .super-tools input {
+  color-scheme: dark; background: var(--ink-2); color: var(--text); border: 1px solid var(--line); min-height: 41px;
+  padding: 7px 10px; border-radius: 9px; font: inherit; min-width: 0;
+}
+.super-tools input[type="search"] { width: min(100%, 300px); }
+.super-tools label:has(input[type="search"]) { flex: 1 1 215px; }
+.super-tools .btn { align-self: end; }
+.supervisor-shell .super-table { margin-top: 11px; }
+.supervisor-shell .super-table table { min-width: 520px; }
+.supervisor-shell .super-table th, .supervisor-shell .super-table td { font-size: .88rem; }
+.supervisor-shell .super-empty { padding: 22px 12px; color: var(--text-soft); }
+.super-pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; font-size: .86rem; }
+.super-note { margin: 10px 0; color: var(--text-soft); font-size: .84rem; }
+.super-activity { padding: 0; list-style: none; margin: 0; }
+.super-activity li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.super-activity li:last-child { border-bottom: 0; }
+.super-activity time { color: var(--text-soft); font-size: .82rem; white-space: nowrap; }
+.super-dialog { width: min(680px, calc(100% - 24px)); color: var(--text); background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(14px, 3vw, 24px); }
+.super-dialog::backdrop { background: #050b09c7; }
+.super-dialog .profile-grid b { overflow-wrap: anywhere; white-space: pre-wrap; }
+.super-dialog .super-close { float: inline-end; margin-inline-start: 10px; }
+.super-dialog .super-profile { display: flex; flex-direction: column; gap: 10px; }
+.super-dialog .super-profile h3 { font-size: 1rem; }
+.super-reports { margin-top: 14px; }
+.super-reports select { margin-bottom: 0; }
+.super-reports .card + .card, .supervisor-shell .super-section { margin-top: 14px; }
+.super-print { display: none; }
+@media (max-width: 500px) {
+  .super-title, .supervisor-shell .topbar { align-items: start; }
+  .supervisor-shell .topbar .who { min-width: 0; }
+  .supervisor-shell .topbar .who img { width: 38px; height: 38px; }
+  .supervisor-shell .topbar .who h1 { line-height: 1.4; }
+  .supervisor-shell .super-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .supervisor-shell .side nav a { font-size: .79rem; }
+}
+@media print {
+  @page { margin: 13mm; }
+  body.super-printing { background: white; color: #161616; }
+  body.super-printing > :not(.super-print) { display: none !important; }
+  body.super-printing .super-print { display: block; font: 11pt Arial, sans-serif; }
+  .super-print h1 { font-size: 19pt; }
+  .super-print p { margin: 8px 0 14px; }
+  .super-print table { width: 100%; border-collapse: collapse; }
+  .super-print th, .super-print td { border: 1px solid #aaa; padding: 5px 7px; text-align: start; }
+  .super-print th { background: #eee; }
+  .super-print tr { break-inside: avoid; }
+}
