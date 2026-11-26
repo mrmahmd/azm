@@ -182,7 +182,7 @@
   }
   function viewActivate() {
     return card(head('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></svg>', 'var(--gold)', 'تفعيل حساب الطاقم', 'اكتب رمز التفعيل اللي وصلك. الرمز يُستخدم مرة وحدة.') +
-      '<form id="activate-form" class="form-grid" novalidate><div class="field"><label for="a-code">رمز التفعيل</label><input id="a-code" dir="ltr" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="AZM-XXXXXX-XXXX" class="code-input"></div>' +
+      '<form id="activate-form" class="form-grid" novalidate><div class="field"><label for="a-code">رمز التفعيل</label><input id="a-code" dir="ltr" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="AZM-…" class="code-input"></div>' +
       '<p class="form-error" id="a-error" role="alert"></p><button class="btn btn-gold btn-block" id="a-submit">تحقق من الرمز</button></form>' +
       '<p class="auth-help"><a href="#login">رجوع للدخول</a></p>');
   }
@@ -232,6 +232,7 @@
       }
       if (profile.role !== 'parent') {
         if (profile.status === 'disabled') { show(card(head(null, '', 'الحساب معطّل', 'تواصل مع الدعم الفني.') + logoutLink())); return; }
+        if (profile.status === 'active' && profile.role === 'support' && window.AZM_SUPPORT) return openSupport();
         if (profile.status === 'active' && (profile.role === 'coach' || profile.role === 'support')) return loadCoachRequests();
         show(viewStaffHome()); return;
       }
@@ -338,7 +339,8 @@
         var zero = digit <= '\u0669' ? '\u0660' : '\u06f0';
         return String(digit.charCodeAt(0) - zero.charCodeAt(0));
       })
-      .replace(/^AZM-?([A-Z0-9]{6})-?([A-Z0-9]{4})$/, 'AZM-$1-$2');
+      .replace(/^AZM-?([A-Z0-9]{6})-?([A-Z0-9]{4})$/, 'AZM-$1-$2')
+      .replace(/^AZM-?([A-F0-9]{12})-?([A-F0-9]{12})$/, 'AZM-$1-$2');
   }
 
   function bindActivate() {
@@ -416,6 +418,10 @@
   }
   function stamp(ts) { var d = new Date(ts); return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' · ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 
+  function openSupport() {
+    return window.AZM_SUPPORT.open({ sb: sb, profile: profile, root: $('app'), toast: toast, requests: loadCoachRequests });
+  }
+
   function loadCoachRequests() {
     loadingView();
     var sel = 'id, kind, status, salla_order_no, receipt_path, reject_reason, created_at, reviewed_at, parent_id, ' +
@@ -434,7 +440,7 @@
   function viewCoach() {
     var n = coach.requests.length;
     var nav = '<a href="#" class="on" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><span>الطلبات' + (n ? ' <em class="count">' + n + '</em>' : '') + '</span></a>' +
-      '<span class="nav-soon">باقي الأقسام قريبًا</span>';
+      (profile.role === 'support' ? '<button type="button" class="btn btn-ghost btn-sm" data-support-home>لوحة الدعم الفني</button>' : '<span class="nav-soon">باقي الأقسام قريبًا</span>');
     var cards = coach.requests.map(requestCard).join('') || '<p class="empty">ما فيه طلبات جديدة. 👌</p>';
     var hist = coach.history.map(requestCard).join('');
     return '<div class="shell"><aside class="side"><div class="side-head"><img src="' + LOGO + '" alt=""><div><b>أكاديمية عزم</b><span>' + (profile.role === 'support' ? 'الدعم الفني' : 'لوحة المدرب') + '</span></div></div><nav aria-label="لوحة المدرب">' + nav + '</nav></aside>' +
@@ -527,9 +533,12 @@
   }
 
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-approve], [data-reject], [data-receipt], [data-refresh]');
+    var t = e.target.closest('[data-approve], [data-reject], [data-receipt], [data-refresh], [data-support-home]');
     if (!t) return;
-    if (t.dataset.approve) approveModal(findRequest(t.dataset.approve));
+    if (t.hasAttribute('data-support-home')) {
+      if (profile && profile.role === 'support' && window.AZM_SUPPORT) openSupport();
+    }
+    else if (t.dataset.approve) approveModal(findRequest(t.dataset.approve));
     else if (t.dataset.reject) rejectModal(findRequest(t.dataset.reject));
     else if (t.dataset.receipt) receiptModal(t.dataset.receipt);
     else loadCoachRequests();
