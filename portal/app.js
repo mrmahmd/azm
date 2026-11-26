@@ -19,6 +19,16 @@
   function emailOf(username) { return username.toLowerCase() + C.usernameDomain; }
   function validUsername(u) { return /^[a-z0-9._]{4,20}$/.test(u); }
   function validPhone(p) { return /^05\d{8}$/.test(p); }
+  // الأرقام العربية إلى إنجليزية، والجوال إلى صيغة 05XXXXXXXX
+  function toDigits(s) { return String(s || '').replace(/[٠-٩]/g, function (d) { return d.charCodeAt(0) - 0x660; }).replace(/[۰-۹]/g, function (d) { return d.charCodeAt(0) - 0x6f0; }); }
+  function normPhone(s) {
+    var d = toDigits(s).replace(/\D/g, '');
+    if (/^009665\d{8}$/.test(d)) return '0' + d.slice(5);
+    if (/^9665\d{8}$/.test(d)) return '0' + d.slice(3);
+    if (/^5\d{8}$/.test(d)) return '0' + d;
+    return d;
+  }
+  function normOrder(s) { return toDigits(s).replace(/\D/g, ''); }
   var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
   function fmt(s) { var p = s.split('-'); return +p[2] + ' ' + MONTHS[+p[1] - 1]; }
   function daysLeft(end) { var t = new Date(); t.setHours(0, 0, 0, 0); var p = end.split('-'); return Math.round((new Date(+p[0], +p[1] - 1, +p[2]) - t) / 864e5); }
@@ -59,13 +69,12 @@
       '<div class="field"><label for="k-birth-' + i + '">تاريخ الميلاد</label><input id="k-birth-' + i + '" type="date"></div>' +
       '<div class="field full"><label for="k-health-' + i + '">ملاحظات صحية (اختياري)</label><input id="k-health-' + i + '" placeholder="حساسية، ربو، إصابة سابقة…"></div></div></fieldset>';
   }
-  function requestFields() {
+  function kidsFields() {
     var kids = ''; for (var i = 0; i < kidCount; i++) kids += kidFields(i);
-    return '<div id="kids">' + kids + '</div><button type="button" class="btn btn-ghost btn-block" id="add-kid">+ أضف ابن آخر</button>' +
-      '<p class="form-section">طلب الاشتراك في سلة</p>' +
-      '<a class="btn btn-ghost btn-block" href="' + C.sallaUrl + '" target="_blank" rel="noopener">ما دفعت بعد؟ ادفع في سلة</a>' +
-      '<div class="field"><label for="s-order">رقم طلب سلة <span class="req">إجباري</span></label><input id="s-order" dir="ltr" inputmode="numeric" placeholder="مثال: 48777"><span class="hint">تلقاه في رسالة تأكيد الطلب من سلة.</span></div>' +
-      '<div class="field"><label for="s-receipt">صورة الإيصال (اختياري)</label><input id="s-receipt" type="file" accept="image/jpeg,image/png,image/webp,image/heic"></div>';
+    return '<div id="kids">' + kids + '</div><button type="button" class="btn btn-ghost btn-block" id="add-kid">+ أضف ابن آخر</button>';
+  }
+  function phoneField(id) {
+    return '<div class="field"><label for="' + id + '">رقم الجوال <span class="req">يكون اسم المستخدم</span></label><input id="' + id + '" dir="ltr" inputmode="tel" autocomplete="tel" placeholder="05XXXXXXXX"><span class="hint" data-user-msg>تدخل به البوابة، ونتواصل معك عليه بالواتساب.</span></div>';
   }
   function logoutLink() { return '<p class="auth-help"><a href="#" data-logout>تسجيل الخروج</a></p>'; }
 
@@ -103,6 +112,29 @@
     });
     return function () { return ok; };
   }
+  // رقم الجوال هو اسم مستخدم ولي الأمر، فنتأكد إنه مو مسجّل قبل
+  function watchPhone(input, onChange) {
+    var msg = input.parentNode.querySelector('[data-user-msg]'), ok = false, timer = null, seq = 0;
+    function show(cls, text) { msg.className = 'hint' + (cls ? ' ' + cls : ''); msg.textContent = text; }
+    input.addEventListener('input', function () {
+      var v = normPhone(input.value); ok = false; if (onChange) onChange();
+      clearTimeout(timer);
+      if (!input.value.trim()) return show('', 'تدخل به البوابة، ونتواصل معك عليه بالواتساب.');
+      if (!validPhone(v)) return show('bad', 'رقم الجوال يبدأ بـ 05 ويتكون من 10 أرقام.');
+      show('', 'نتحقق…');
+      var mine = ++seq;
+      timer = setTimeout(function () {
+        sb.rpc('username_available', { p_username: v }).then(function (res) {
+          if (mine !== seq) return;
+          if (res.error) return show('bad', 'تعذّر التحقق الآن');
+          ok = res.data === true;
+          show(ok ? 'good' : 'bad', ok ? '✓ الرقم ' + v + ' جاهز' : '✗ الرقم ' + v + ' عنده حساب. سجّل دخولك بدل حساب جديد.');
+          if (onChange) onChange();
+        });
+      }, 350);
+    });
+    return function () { return ok; };
+  }
   function bindAddKid() {
     $('add-kid').addEventListener('click', function () {
       var box = document.createElement('div'); box.innerHTML = kidFields(kidCount++);
@@ -120,33 +152,58 @@
     return { kids: kids };
   }
 
-  /* ---------- إرسال طلب التسجيل ---------- */
-  function submitRequest(kind, kids, order, file) {
-    var uid = session.user.id, receiptPath = null;
-    var upload = Promise.resolve();
-    if (file) {
-      var ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-      receiptPath = uid + '/' + Date.now() + '.' + ext;
-      upload = sb.storage.from('receipts').upload(receiptPath, file, { upsert: false }).then(function (r) { if (r.error) throw r.error; });
-    }
-    var playerIds;
-    return upload.then(function () {
-      return sb.from('players').insert(kids.map(function (k) { return { parent_id: uid, full_name: k.full_name, birth_date: k.birth_date, health_notes: k.health_notes }; })).select('id');
-    }).then(function (r) {
+  /* ---------- إرسال طلب التسجيل (عملية واحدة على الخادم) ---------- */
+  function submitRequest(method, order, kids) {
+    return sb.rpc('submit_registration', { p_method: method, p_order: order || null, p_kids: kids }).then(function (r) {
       if (r.error) throw r.error;
-      playerIds = r.data.map(function (x) { return x.id; });
-      return sb.from('registration_requests').insert({ parent_id: uid, kind: kind, salla_order_no: order, receipt_path: receiptPath }).select('id').single();
-    }).then(function (r) {
-      if (r.error) throw r.error;
-      return sb.from('request_players').insert(playerIds.map(function (pid) { return { request_id: r.data.id, player_id: pid }; }));
-    }).then(function (r) { if (r.error) throw r.error; });
+      return r.data;
+    });
+  }
+  var ORDER_MSG = {
+    not_found: 'رقم الطلب غير مسجّل عندنا. تأكد من الرقم في رسالة سلة، ولو متأكد منه تواصل معنا ونضيفه.',
+    used: 'رقم الطلب هذا اتسجّل به حساب قبل. لو عندك حساب سجّل دخولك، أو تواصل معنا.',
+    invalid: 'رقم الطلب أرقام فقط، زي ما يظهر في رسالة سلة.',
+    too_many: 'محاولات كثيرة. انتظر ربع ساعة وحاول مرة ثانية.',
+    request_exists: 'عندك طلب قيد المراجعة.'
+  };
+  var PAY_NAMES = { salla: 'سلة', cash: 'كاش', card: 'بطاقة' };
+  var PLAN_NAMES = { offer: 'عرض التأسيس', monthly: 'شهري' };
+  var VENUE = 'حي الزهراء';
+  var MAP_URL = 'https://www.google.com/maps?q=21.60126495361328,39.13291549682617';
+
+  /* ---------- مواعيد الحصص (0 = الأحد) ---------- */
+  var DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  function t12(t) { var p = String(t).split(':'), h = +p[0]; return (h % 12 || 12) + ':' + p[1] + (h < 12 ? ' ص' : ' م'); }
+  // «السبت والثلاثاء 7:00 م إلى 8:30 م، والخميس 6:00 م إلى 7:30 م» بترتيب الأسبوع من السبت
+  function slotsText(slots) {
+    var byTime = {}, order = [];
+    (slots || []).slice().sort(function (a, b) { return (a.weekday + 1) % 7 - (b.weekday + 1) % 7 || (a.start_time < b.start_time ? -1 : 1); }).forEach(function (x) {
+      var key = t12(x.start_time) + ' إلى ' + t12(x.end_time);
+      if (!byTime[key]) { byTime[key] = []; order.push(key); }
+      byTime[key].push(DAYS[x.weekday]);
+    });
+    return order.map(function (k) { return byTime[k].join(' و') + ' ' + k; }).join('، و');
+  }
+  function nextSlot(slots) {
+    var now = new Date(), best = null;
+    (slots || []).forEach(function (x) {
+      var p = String(x.start_time).split(':'), d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), +p[0], +p[1]);
+      d.setDate(d.getDate() + ((x.weekday - now.getDay() + 7) % 7));
+      if (d <= now) d.setDate(d.getDate() + 7);
+      if (!best || d < best.at) best = { at: d, slot: x };
+    });
+    if (!best) return '';
+    var days = Math.round((new Date(best.at.getFullYear(), best.at.getMonth(), best.at.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+    return (days === 0 ? 'اليوم' : days === 1 ? 'بكرة' : DAYS[best.slot.weekday]) + ' ' + t12(best.slot.start_time);
   }
 
   /* ---------- الشاشات ---------- */
   function viewLogin() {
     var staff = MODE === 'staff';
     return card(head(null, '', staff ? 'بوابة طاقم عزم' : 'بوابة أولياء الأمور', staff ? 'للمدرب والمشرفين والدعم الفني' : 'تابع اشتراك ابنك وحضوره وتقاريره') +
-      '<form id="login-form" class="form-grid" novalidate><div class="field"><label for="u">اسم المستخدم</label><input id="u" dir="ltr" autocomplete="username" autocapitalize="none" spellcheck="false"></div>' +
+      '<form id="login-form" class="form-grid" novalidate><div class="field">' + (staff
+        ? '<label for="u">اسم المستخدم</label><input id="u" dir="ltr" autocomplete="username" autocapitalize="none" spellcheck="false">'
+        : '<label for="u">رقم الجوال</label><input id="u" dir="ltr" inputmode="tel" autocomplete="username" placeholder="05XXXXXXXX">') + '</div>' +
       '<div class="field"><label for="p">كلمة المرور</label><input id="p" type="password" dir="ltr" autocomplete="current-password"></div>' +
       '<p class="form-error" id="l-error" role="alert"></p><button class="btn btn-gold btn-block">دخول</button></form>' +
       '<div class="auth-links">' + (staff
@@ -155,29 +212,54 @@
       '<p class="auth-help">نسيت كلمة المرور؟ ' + (staff ? 'تواصل مع الدعم الفني ويعيد تعيينها لك.' : '<a href="' + WA + '" target="_blank" rel="noopener">تواصل معنا</a> ونعيد تعيينها لك.') + '</p>' +
       (staff ? '' : '<a class="back-home" href="../">← الموقع الرئيسي</a>'));
   }
-  function viewSignup() {
-    return card(head(null, '', 'إنشاء حساب ولي أمر', 'بعد الإرسال يراجع المدرب طلبك ويفعّل حسابك.') +
-      '<form id="signup-form" class="form-grid" novalidate>' +
-      '<p class="form-section">1. بياناتك</p>' +
-      '<div class="field"><label for="s-name">الاسم كاملًا</label><input id="s-name" autocomplete="name"></div>' +
-      '<div class="field"><label for="s-phone">رقم الجوال</label><input id="s-phone" dir="ltr" inputmode="tel" autocomplete="tel" placeholder="05XXXXXXXX"></div>' +
-      '<p class="form-section">2. بيانات الدخول</p>' + userField('s-user') + passFields('sp') +
-      '<p class="form-section">3. بيانات الأبناء</p>' + requestFields() +
+  /* ---------- خطوات تسجيل ولي الأمر ----------
+     1. طريقة الدفع  2. رقم طلب سلة (لو سلة)  3. البيانات والأبناء
+     نفس الخطوات لولي الأمر الجديد، ولصاحب حساب ما كمّل طلبه أو انرفض طلبه. */
+  var reg = { method: null, order: null, reason: null };
+  function regTitle() { return session ? (reg.reason ? 'أعد إرسال طلبك' : 'كمّل طلب التسجيل') : 'إنشاء حساب ولي أمر'; }
+  function regFoot() { return session ? logoutLink() : '<p class="auth-help">عندك حساب؟ <a href="#login">سجّل دخولك</a></p>'; }
+  function waAsk(text) { return WA + '?text=' + encodeURIComponent(text); }
+  function viewMethod() {
+    return card(head(null, '', regTitle(), 'كيف دفعت اشتراك ابنك؟') +
+      (reg.reason ? '<div class="reject-box"><span>سبب رفض الطلب السابق</span><p>' + esc(reg.reason) + '</p></div>' : '') +
+      '<div class="method-grid">' +
+      '<button type="button" class="method-card" data-method="salla"><b>اشتركت من متجر سرج (سلة)</b><span>عندك رقم طلب من رسالة تأكيد سلة</span></button>' +
+      '<button type="button" class="method-card" data-method="cash"><b>دفعت كاش أو بطاقة في الأكاديمية</b><span>بدون رقم طلب</span></button></div>' +
+      '<a class="btn btn-ghost btn-block" href="' + C.sallaUrl + '" target="_blank" rel="noopener">ما دفعت بعد؟ اشترك من سلة</a>' + regFoot());
+  }
+  function viewOrderStep() {
+    return card(head(null, '', regTitle(), 'اكتب رقم طلب سلة، ونتأكد إنه مسجّل عندنا.') +
+      '<form id="order-form" class="form-grid" novalidate><div class="field"><label for="o-order">رقم طلب سلة</label><input id="o-order" dir="ltr" inputmode="numeric" autocomplete="off" placeholder="مثال: 48777" value="' + esc(reg.order || '') + '"><span class="hint">تلقاه في رسالة تأكيد الطلب من سلة.</span></div>' +
+      '<div id="o-result" role="alert"></div><button class="btn btn-gold btn-block" id="o-submit">تحقق من الرقم</button></form>' +
+      '<p class="auth-help"><a href="#" data-reg-step="method">← رجوع</a></p>' + regFoot());
+  }
+  function viewDetails() {
+    var salla = reg.method === 'salla';
+    return card(head(null, '', regTitle(), session ? 'باقي بيانات الأبناء.' : 'بعد الإرسال تراجع الأكاديمية طلبك وتفعّل حسابك.') +
+      '<form id="details-form" class="form-grid" novalidate>' +
+      (salla ? '<div class="cred"><div><span>رقم طلب سلة</span><b class="num">' + esc(reg.order) + ' ✓</b></div></div>'
+        : '<p class="form-section">طريقة الدفع</p><div class="chips pay-chips"><label><input type="radio" name="pay" value="cash"> كاش</label><label><input type="radio" name="pay" value="card"> بطاقة</label></div>' +
+          '<p class="hint">تأكد إنك دفعت في الأكاديمية. الطلب يتفعّل بعد ما يتأكدون من استلام المبلغ.</p>') +
+      (session ? '' : '<p class="form-section">بياناتك</p>' +
+        '<div class="field"><label for="s-name">الاسم كاملًا</label><input id="s-name" autocomplete="name"></div>' +
+        phoneField('s-phone') + passFields('sp')) +
+      '<p class="form-section">بيانات الأبناء</p>' + kidsFields() +
       '<p class="form-error" id="s-error" role="alert"></p>' +
       '<button class="btn btn-gold btn-block" id="s-submit">إرسال طلب التسجيل</button></form>' +
-      '<p class="auth-help">عندك حساب؟ <a href="#login">سجّل دخولك</a></p>');
+      '<p class="auth-help"><a href="#" data-reg-step="' + (salla ? 'order' : 'method') + '">← رجوع</a></p>' + regFoot());
   }
-  function viewRequestForm(reason) {
-    return card(head(null, '', reason ? 'أعد إرسال طلبك' : 'كمّل طلب التسجيل', reason ? 'عدّل البيانات حسب سبب الرفض وأرسل الطلب من جديد.' : 'حسابك جاهز، باقي بيانات الأبناء وطلب سلة.') +
-      (reason ? '<div class="reject-box"><span>سبب الرفض من المدرب</span><p>' + esc(reason) + '</p></div>' : '') +
-      '<form id="request-form" class="form-grid" novalidate style="margin-top:14px"><p class="form-section">بيانات الأبناء</p>' + requestFields() +
-      '<p class="form-error" id="r-error" role="alert"></p><button class="btn btn-gold btn-block" id="r-submit">إرسال الطلب</button></form>' + logoutLink());
+  function showReg(step) {
+    if (step === 'order') { show(viewOrderStep()); bindOrderStep(); }
+    else if (step === 'details') { kidCount = 1; show(viewDetails()); bindDetails(); }
+    else { show(viewMethod()); }
   }
   function viewPending(req) {
     var kids = (req.request_players || []).map(function (rp) { return rp.players && rp.players.full_name.split(' ')[0]; }).filter(Boolean).join('، ');
-    return card(head('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'var(--yellow)', 'طلبك قيد المراجعة', 'وصل طلبك للمدرب، ويتفعّل حسابك أول ما يتأكد من البيانات وطلب سلة.') +
-      '<ol class="steps"><li class="done">أرسلت الطلب</li><li class="now">مراجعة المدرب</li><li>تفعيل الحساب</li></ol>' +
-      '<div class="cred"><div><span>اسم المستخدم</span><b class="num">' + esc(profile.username) + '</b></div>' + (kids ? '<div><span>الأبناء</span><b class="plain">' + esc(kids) + '</b></div>' : '') + '<div><span>رقم طلب سلة</span><b class="num">' + esc(req.salla_order_no) + '</b></div></div>' +
+    var pay = req.salla_order_no ? '<div><span>رقم طلب سلة</span><b class="num">' + esc(req.salla_order_no) + '</b></div>'
+      : '<div><span>طريقة الدفع</span><b class="plain">' + esc(PAY_NAMES[req.payment_method] || '—') + '</b></div>';
+    return card(head('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', 'var(--yellow)', 'طلبك قيد المراجعة', 'وصل طلبك للأكاديمية، ويتفعّل حسابك أول ما تراجع البيانات.') +
+      '<ol class="steps"><li class="done">أرسلت الطلب</li><li class="now">مراجعة الأكاديمية</li><li>تفعيل الحساب</li></ol>' +
+      '<div class="cred"><div><span>' + (validPhone(profile.username) ? 'رقم الجوال (اسم المستخدم)' : 'اسم المستخدم') + '</span><b class="num">' + esc(profile.username) + '</b></div>' + (kids ? '<div><span>الأبناء</span><b class="plain">' + esc(kids) + '</b></div>' : '') + pay + '</div>' +
       '<a class="btn btn-wa btn-block" style="margin-top:16px" href="' + WA + '" target="_blank" rel="noopener">تأخر الرد؟ تواصل معنا</a>' + logoutLink());
   }
   function viewActivate() {
@@ -198,12 +280,26 @@
   }
   function viewParentHome(players) {
     var list = players.map(function (p) {
-      var subs = (p.subscriptions || []).slice().sort(function (a, b) { return a.end_date < b.end_date ? 1 : -1; }), s = subs[0];
-      var st = !s ? '<span class="st st-off">بدون اشتراك</span>' : daysLeft(s.end_date) < 0 ? '<span class="st st-bad">منتهي</span>' : daysLeft(s.end_date) <= 7 ? '<span class="st st-warn">باقي ' + daysLeft(s.end_date) + ' يوم</span>' : '<span class="st st-ok">باقي ' + daysLeft(s.end_date) + ' يوم</span>';
-      return '<article class="prow"><div class="prow-top"><span class="avatar">' + esc(p.full_name.charAt(0)) + '</span><div><h4>' + esc(p.full_name) + '</h4><p class="muted">' + esc((p.groups && p.groups.name) || (p.status === 'pending' ? 'قيد المراجعة' : '')) + (s ? ' · ينتهي ' + fmt(s.end_date) : '') + '</p></div>' + st + '</div></article>';
+      var subs = (p.subscriptions || []).slice().sort(function (a, b) { return a.end_date < b.end_date ? 1 : -1; }), s = subs[0], g = p.groups;
+      var top = '<div class="prow-top"><span class="avatar">' + esc(p.full_name.charAt(0)) + '</span><div><h4>' + esc(p.full_name) + '</h4><p class="muted">' + esc(g ? 'مجموعة ' + g.name : '') + '</p></div>';
+      if (p.status === 'pending' || !s) {
+        return '<article class="prow">' + top + '<span class="st st-warn">بانتظار المدرب</span></div>' +
+          '<p class="muted sub-wait">المدرب يحدد مجموعة ' + esc(p.full_name.split(' ')[0]) + ' ومدة اشتراكه ومواعيد الحصص، وتظهر هنا أول ما يخلص.</p></article>';
+      }
+      var left = daysLeft(s.end_date), started = daysLeft(s.start_date) <= 0;
+      var st = left < 0 ? '<span class="st st-bad">منتهي</span>' : !started ? '<span class="st st-info">يبدأ ' + fmt(s.start_date) + '</span>' : left <= 7 ? '<span class="st st-warn">باقي ' + left + ' يوم</span>' : '<span class="st st-ok">باقي ' + left + ' يوم</span>';
+      var slots = g && g.group_slots, next = left >= 0 ? nextSlot(slots) : '';
+      return '<article class="prow">' + top + st + '</div><dl class="sub-details">' +
+        '<div><dt>الاشتراك</dt><dd>' + esc(PLAN_NAMES[s.plan] || '') + '</dd></div>' +
+        '<div><dt>من</dt><dd>' + fmt(s.start_date) + '</dd></div><div><dt>إلى</dt><dd>' + fmt(s.end_date) + '</dd></div>' +
+        (slots && slots.length ? '<div class="wide"><dt>مواعيد الحصص</dt><dd>' + esc(slotsText(slots)) + '</dd></div>' : '') +
+        (next ? '<div class="wide"><dt>الحصة الجاية</dt><dd class="next">' + esc(next) + '</dd></div>' : '') +
+        '</dl>' + (left >= 0 && left <= 7 ? '<p class="sub-renew">اشتراكه يخلص قريب. جدّد من سلة أو تواصل معنا.</p>' : left < 0 ? '<p class="sub-renew">انتهى الاشتراك. جدّد من سلة أو تواصل معنا.</p>' : '') + '</article>';
     }).join('');
-    return card(head(null, '', 'أهلًا ' + esc(profile.full_name.split(' ')[0] || ''), 'حسابك مفعّل. لوحتك الكاملة (الحضور والتقارير) تظهر هنا قريبًا.') +
+    var hasSub = players.some(function (p) { return p.status === 'active'; });
+    return card(head(null, '', 'أهلًا ' + esc(profile.full_name.split(' ')[0] || ''), 'تفاصيل اشتراك أبنائك ومواعيد الحصص.') +
       '<div class="kids-list">' + (list || '<p class="empty">لا يوجد لاعبون بعد.</p>') + '</div>' +
+      (hasSub ? '<a class="venue-box" href="' + MAP_URL + '" target="_blank" rel="noopener"><span>مكان التدريب</span><b>' + VENUE + '</b><em>افتح الموقع في الخرائط ←</em></a>' : '') +
       '<a class="btn btn-wa btn-block" style="margin-top:16px" href="' + WA + '" target="_blank" rel="noopener">تواصل مع الأكاديمية</a>' + logoutLink());
   }
 
@@ -236,24 +332,23 @@
           return window.AZM_SUPERVISOR.open({ sb: sb, profile: profile, root: $('app') });
         }
         if (profile.status === 'active' && profile.role === 'support' && window.AZM_SUPPORT) return openSupport();
-        if (profile.status === 'active' && (profile.role === 'coach' || profile.role === 'support')) return loadCoachRequests();
+        if (profile.status === 'active' && profile.role === 'coach') return loadNewPlayers();
         show(viewStaffHome()); return;
       }
       if (profile.status === 'disabled') { show(card(head(null, '', 'الحساب معطّل', 'تواصل مع الأكاديمية لإعادة تفعيله.') + '<a class="btn btn-wa btn-block" href="' + WA + '" target="_blank" rel="noopener">تواصل معنا</a>' + logoutLink())); return; }
       if (profile.status === 'active') {
-        return sb.from('players').select('id, full_name, status, groups(name), subscriptions(start_date, end_date)').eq('parent_id', profile.id).neq('status', 'archived').order('created_at').then(function (p) {
+        return sb.from('players').select('id, full_name, status, groups(name, group_slots(weekday, start_time, end_time)), subscriptions(plan, start_date, end_date)').eq('parent_id', profile.id).neq('status', 'archived').order('created_at').then(function (p) {
           if (p.error) throw p.error;
           show(viewParentHome(p.data));
         });
       }
       // قيد المراجعة أو مرفوض: نشوف آخر طلب
-      return sb.from('registration_requests').select('id, status, salla_order_no, reject_reason, created_at, request_players(players(full_name))').eq('parent_id', profile.id).order('created_at', { ascending: false }).limit(1).then(function (q) {
+      return sb.from('registration_requests').select('id, status, salla_order_no, payment_method, reject_reason, created_at, request_players(players(full_name))').eq('parent_id', profile.id).order('created_at', { ascending: false }).limit(1).then(function (q) {
         if (q.error) throw q.error;
         var req = q.data[0];
         if (req && req.status === 'pending') { show(viewPending(req)); return; }
-        kidCount = 1;
-        show(viewRequestForm(req && req.status === 'rejected' ? req.reject_reason : null));
-        bindRequestForm();
+        reg = { method: null, order: null, reason: req && req.status === 'rejected' ? req.reject_reason : null };
+        showReg('method');
       });
     }).catch(function (e) { console.error(e); show(card(head(null, '', 'تعذّر تحميل حسابك', friendly(e)) + '<button class="btn btn-gold btn-block" data-retry>حاول مرة ثانية</button>' + logoutLink())); });
   }
@@ -264,7 +359,7 @@
       if (h === 'firstuse' && activation) { show(viewFirstUse()); bindFirstUse(); return; }
       routeSignedIn(); return;
     }
-    if (h === 'signup' && MODE === 'parent') { kidCount = 1; show(viewSignup()); bindSignup(); }
+    if (h === 'signup' && MODE === 'parent') { reg = { method: null, order: null, reason: null }; showReg('method'); }
     else if (h === 'activate' && MODE === 'staff') { show(viewActivate()); bindActivate(); }
     else if (h === 'firstuse' && activation && MODE === 'staff') { show(viewFirstUse()); bindFirstUse(); }
     else { show(viewLogin()); bindLogin(); }
@@ -274,7 +369,9 @@
   function bindLogin() {
     $('login-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      var u = val('u').toLowerCase(), p = $('p').value, btn = e.target.querySelector('button');
+      var raw = val('u'), p = $('p').value, btn = e.target.querySelector('button');
+      // أولياء الأمور يدخلون برقم الجوال، بأي صيغة كتبوه
+      var u = MODE === 'parent' && validPhone(normPhone(raw)) ? normPhone(raw) : raw.toLowerCase();
       setError('l-error');
       if (!u || !p) return setError('l-error', 'اكتب اسم المستخدم وكلمة المرور.');
       busy(btn, true, 'جاري الدخول…');
@@ -286,53 +383,70 @@
     });
   }
 
-  function bindSignup() {
-    var passOk = watchPassword('sp'), userOk = watchUsername($('s-user'));
-    bindAddKid();
-    $('signup-form').addEventListener('submit', function (e) {
+  function bindOrderStep() {
+    $('order-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      setError('s-error');
-      var name = val('s-name'), phone = val('s-phone').replace(/\s/g, ''), user = val('s-user'), pass = $('sp1').value, order = val('s-order'), file = $('s-receipt').files[0];
-      if (name.length < 3) { $('s-name').focus(); return setError('s-error', 'اكتب اسمك كاملًا.'); }
-      if (!validPhone(phone)) { $('s-phone').focus(); return setError('s-error', 'رقم الجوال لازم يبدأ بـ 05 ويتكون من 10 أرقام.'); }
-      if (!userOk()) { $('s-user').focus(); return setError('s-error', 'اختر اسم مستخدم متاح.'); }
-      if (!passOk()) { $('sp1').focus(); return setError('s-error', 'كلمة المرور لا تحقق الشروط أو غير متطابقة.'); }
-      var k = readKids(); if (k.error) { $(k.focus).focus(); return setError('s-error', k.error); }
-      if (!order) { $('s-order').focus(); return setError('s-error', 'رقم طلب سلة إجباري.'); }
-      if (file && file.size > 5 * 1024 * 1024) return setError('s-error', 'صورة الإيصال أكبر من 5 ميجا.');
-
-      var btn = $('s-submit'); busy(btn, true, 'جاري الإرسال…');
-      sb.auth.signUp({ email: emailOf(user), password: pass, options: { data: { username: user, full_name: name, phone: phone } } }).then(function (r) {
-        if (r.error) throw r.error;
-        if (!r.data.session) throw new Error('no session');
-        session = r.data.session;
-        return submitRequest('new_account', k.kids, order, file);
-      }).then(function () {
-        location.hash = ''; routeSignedIn().then(function () { toast('وصل طلبك للمدرب'); });
-      }).catch(function (err) {
-        console.error(err); busy(btn, false);
-        // لو انعمل الحساب وتعثّر الطلب، يكمّله ولي الأمر من شاشة «كمّل طلب التسجيل»
-        if (session) { routeSignedIn().then(function () { toast('انعمل حسابك، لكن الطلب ما وصل. كمّله من هنا.'); }); return; }
-        setError('s-error', friendly(err));
+      var order = normOrder(val('o-order')), btn = $('o-submit'), box = $('o-result');
+      box.innerHTML = '';
+      if (!/^\d{3,20}$/.test(order)) { $('o-order').focus(); box.innerHTML = '<p class="form-error">' + ORDER_MSG.invalid + '</p>'; return; }
+      busy(btn, true, 'نتحقق…');
+      sb.rpc('check_salla_order', { p_order: order }).then(function (r) {
+        busy(btn, false);
+        if (r.error) { box.innerHTML = '<p class="form-error">' + esc(friendly(r.error)) + '</p>'; return; }
+        if (r.data === 'ok') { reg.order = order; showReg('details'); return; }
+        reg.order = order;
+        box.innerHTML = '<div class="reject-box"><span>ما قدرنا نكمل بالرقم ' + esc(order) + '</span><p>' + esc(ORDER_MSG[r.data] || friendly(r.data)) + '</p></div>' +
+          (r.data === 'too_many' ? '' : '<a class="btn btn-wa btn-block" style="margin-top:10px" target="_blank" rel="noopener" href="' + esc(waAsk('أهلًا، أبغى أسجّل في أكاديمية عزم برقم طلب سلة ' + order + ' والمنصة تقول ' + (r.data === 'used' ? 'إنه مستخدم.' : 'إنه غير مسجّل.'))) + '">تواصل معنا بالواتساب</a>');
       });
     });
   }
 
-  function bindRequestForm() {
+  function bindDetails() {
+    var passOk = session ? null : watchPassword('sp'), phoneOk = session ? null : watchPhone($('s-phone'));
     bindAddKid();
-    $('request-form').addEventListener('submit', function (e) {
+    $('details-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      setError('r-error');
-      var k = readKids(); if (k.error) { $(k.focus).focus(); return setError('r-error', k.error); }
-      var order = val('s-order'), file = $('s-receipt').files[0];
-      if (!order) { $('s-order').focus(); return setError('r-error', 'رقم طلب سلة إجباري.'); }
-      if (file && file.size > 5 * 1024 * 1024) return setError('r-error', 'صورة الإيصال أكبر من 5 ميجا.');
-      var btn = $('r-submit'); busy(btn, true, 'جاري الإرسال…');
-      submitRequest('new_account', k.kids, order, file).then(function () {
-        routeSignedIn().then(function () { toast('وصل طلبك للمدرب'); });
-      }).catch(function (err) { console.error(err); busy(btn, false); setError('r-error', friendly(err)); });
+      setError('s-error');
+      var method = reg.method === 'salla' ? 'salla' : ((document.querySelector('input[name="pay"]:checked') || {}).value || '');
+      if (!method) return setError('s-error', 'اختر طريقة الدفع: كاش أو بطاقة.');
+      var name, phone, pass;
+      if (!session) {
+        name = val('s-name'); phone = normPhone(val('s-phone')); pass = $('sp1').value;
+        if (name.length < 3) { $('s-name').focus(); return setError('s-error', 'اكتب اسمك كاملًا.'); }
+        if (!validPhone(phone)) { $('s-phone').focus(); return setError('s-error', 'رقم الجوال يبدأ بـ 05 ويتكون من 10 أرقام.'); }
+        if (!phoneOk()) { $('s-phone').focus(); return setError('s-error', 'الرقم هذا عنده حساب، أو لسه ما خلصنا التحقق منه.'); }
+        if (!passOk()) { $('sp1').focus(); return setError('s-error', 'كلمة المرور لا تحقق الشروط أو غير متطابقة.'); }
+      }
+      var k = readKids(); if (k.error) { $(k.focus).focus(); return setError('s-error', k.error); }
+
+      var btn = $('s-submit'), created = false; busy(btn, true, 'جاري الإرسال…');
+      var start = session ? Promise.resolve() : sb.auth.signUp({ email: emailOf(phone), password: pass, options: { data: { username: phone, full_name: name, phone: phone } } }).then(function (r) {
+        if (r.error) throw r.error;
+        if (!r.data.session) throw new Error('no session');
+        session = r.data.session; created = true;
+      });
+      start.then(function () {
+        return submitRequest(method, reg.order, k.kids);
+      }).then(function (status) {
+        if (status === 'ok' || status === 'request_exists') { location.hash = ''; routeSignedIn().then(function () { toast('وصل طلبك للأكاديمية'); }); return; }
+        if (created) { location.hash = ''; routeSignedIn().then(function () { toast('انعمل حسابك، لكن الطلب ما وصل: ' + (ORDER_MSG[status] || '')); }); return; }
+        busy(btn, false); setError('s-error', ORDER_MSG[status] || friendly(status));
+      }).catch(function (err) {
+        console.error(err); busy(btn, false);
+        // لو انعمل الحساب وتعثّر الطلب، يكمّله ولي الأمر من نفس الخطوات بعد الدخول
+        if (created) { location.hash = ''; routeSignedIn().then(function () { toast('انعمل حسابك، لكن الطلب ما وصل. كمّله من هنا.'); }); return; }
+        setError('s-error', /already registered|already exists|duplicate key.*username/i.test(err && err.message || '') ? 'رقم الجوال هذا عنده حساب. سجّل دخولك.' : friendly(err));
+      });
     });
   }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-method], [data-reg-step]');
+    if (!t) return;
+    e.preventDefault();
+    if (t.dataset.method) { reg.method = t.dataset.method; reg.order = null; showReg(reg.method === 'salla' ? 'order' : 'details'); }
+    else showReg(t.dataset.regStep);
+  });
 
   function normalizeActivationCode(code) {
     return code.toUpperCase()
@@ -407,8 +521,8 @@
   /* ---------- لوحة المدرب: طلبات التسجيل ---------- */
   var PORTAL_URL = 'azm.sorog.net/portal';
   var KIND = { new_account: ['حساب جديد', 'st-info'], new_child: ['ابن جديد لحساب قائم', 'st-ok'], renewal: ['تجديد اشتراك', 'st-warn'] };
-  var REASONS = ['رقم طلب سلة غير صحيح', 'الطلب غير مدفوع في سلة', 'بيانات اللاعب ناقصة', 'الفئة العمرية غير متاحة حاليًا'];
-  var coach = { requests: [], groups: [], history: [] };
+  var REASONS = ['لم نستلم المبلغ بعد', 'الطلب غير مدفوع في سلة', 'بيانات اللاعب ناقصة', 'الفئة العمرية غير متاحة حاليًا'];
+  var coach = { requests: [], groups: [], history: [], newPlayers: [] };
 
   function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function addMonth(s) { var p = s.split('-'), d = new Date(+p[0], +p[1] - 1, +p[2]); d.setMonth(d.getMonth() + 1); return iso(d); }
@@ -425,81 +539,143 @@
     return window.AZM_SUPPORT.open({ sb: sb, profile: profile, root: $('app'), toast: toast, requests: loadCoachRequests });
   }
 
+  // الدعم الفني يراجع الطلبات ويفعّل الحساب، والمدرب يحدد مجموعة كل لاعب ومدة اشتراكه
+  var staffView = 'requests';
+  function staffShell(title, desc, body) {
+    var support = profile.role === 'support', nr = coach.requests.length, nn = coach.newPlayers.length;
+    var icon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg>';
+    var icon2 = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M17 8v6M14 11h6"/></svg>';
+    function item(v, ic, label, n) { return '<a href="#" data-staff-view="' + v + '"' + (staffView === v ? ' class="on" aria-current="page"' : '') + '>' + ic + '<span>' + label + (n ? ' <em class="count">' + n + '</em>' : '') + '</span></a>'; }
+    var nav = (support ? item('requests', icon, 'طلبات التسجيل', nr) : '') + item('new', icon2, 'المشتركين الجدد', nn) +
+      (support ? '<button type="button" class="btn btn-ghost btn-sm" data-support-home>لوحة الدعم الفني</button>' : '<span class="nav-soon">باقي الأقسام قريبًا</span>');
+    return '<div class="shell"><aside class="side"><div class="side-head"><img src="' + LOGO + '" alt=""><div><b>أكاديمية عزم</b><span>' + (support ? 'الدعم الفني' : 'لوحة المدرب') + '</span></div></div><nav aria-label="أقسام اللوحة">' + nav + '</nav></aside>' +
+      '<main class="main"><div class="topbar"><div class="who"><img src="' + LOGO + '" alt="أكاديمية عزم"><div><h1>' + esc(profile.full_name) + '<span class="role-badge">' + ROLE_NAMES[profile.role] + '</span></h1><p class="num">' + esc(profile.username) + '</p></div></div>' +
+      '<div class="prow-actions"><button class="btn btn-ghost btn-sm" type="button" data-refresh>تحديث</button><button class="btn btn-ghost btn-sm" type="button" data-logout>خروج</button></div></div>' +
+      '<h2 class="page-title">' + title + '</h2><p class="muted" style="margin-bottom:14px">' + desc + '</p>' + body + '</main></div>';
+  }
+  function loadGroups() {
+    return sb.from('groups').select('id, name, coach_id, group_slots(weekday, start_time, end_time)').eq('is_active', true).order('name').then(function (r) {
+      if (r.error) throw r.error;
+      // المدرب يختار من مجموعاته، والدعم الفني من كل المجموعات
+      coach.groups = r.data.filter(function (g) { return profile.role === 'support' || g.coach_id === profile.id; });
+    });
+  }
+  function fetchNewPlayers() {
+    return sb.from('players').select('id, full_name, birth_date, health_notes, created_at, parent:profiles!players_parent_id_fkey(full_name, username, phone, status), request_players(registration_requests(status, payment_method, salla_order_no, reviewed_at))')
+      .eq('status', 'pending').is('group_id', null).order('created_at').then(function (r) {
+        if (r.error) throw r.error;
+        coach.newPlayers = r.data.filter(function (p) {
+          return p.parent && p.parent.status === 'active' && (p.request_players || []).some(function (rp) { return rp.registration_requests && rp.registration_requests.status === 'approved'; });
+        });
+      });
+  }
+
   function loadCoachRequests() {
+    staffView = 'requests';
     loadingView();
-    var sel = 'id, kind, status, salla_order_no, receipt_path, reject_reason, created_at, reviewed_at, parent_id, ' +
+    var sel = 'id, kind, status, salla_order_no, payment_method, reject_reason, created_at, reviewed_at, parent_id, ' +
       'parent:profiles!registration_requests_parent_id_fkey(full_name, username, phone), ' +
       'request_players(player_id, players(id, full_name, birth_date, health_notes, status, group_id))';
     return Promise.all([
       sb.from('registration_requests').select(sel).eq('status', 'pending').order('created_at'),
       sb.from('registration_requests').select(sel).neq('status', 'pending').order('reviewed_at', { ascending: false }).limit(10),
-      sb.from('groups').select('id, name, age_category, color').eq('is_active', true).order('name')
+      loadGroups(), fetchNewPlayers()
     ]).then(function (r) {
-      for (var i = 0; i < r.length; i++) if (r[i].error) throw r[i].error;
-      coach.requests = r[0].data; coach.history = r[1].data; coach.groups = r[2].data;
-      show(viewCoach());
+      for (var i = 0; i < 2; i++) if (r[i].error) throw r[i].error;
+      coach.requests = r[0].data; coach.history = r[1].data;
+      var cards = coach.requests.map(requestCard).join('') || '<p class="empty">ما فيه طلبات جديدة. 👌</p>';
+      var hist = coach.history.map(requestCard).join('');
+      show(staffShell('طلبات التسجيل', 'طلبات سلة رقمها موجود في قائمة أرقام سلة. طلبات الكاش أو البطاقة تأكد من استلام المبلغ قبل التفعيل. بعد التفعيل يظهر الأبناء عند المدرب في «المشتركين الجدد».',
+        '<div class="plist">' + cards + '</div>' + (hist ? '<h4 class="report-sub" style="margin-top:22px">آخر الطلبات اللي اتخذت فيها قرار</h4><div class="plist">' + hist + '</div>' : '')));
     });
   }
-  function viewCoach() {
-    var n = coach.requests.length;
-    var nav = '<a href="#" class="on" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M3 13h5l1 3h6l1-3h5"/></svg><span>الطلبات' + (n ? ' <em class="count">' + n + '</em>' : '') + '</span></a>' +
-      (profile.role === 'support' ? '<button type="button" class="btn btn-ghost btn-sm" data-support-home>لوحة الدعم الفني</button>' : '<span class="nav-soon">باقي الأقسام قريبًا</span>');
-    var cards = coach.requests.map(requestCard).join('') || '<p class="empty">ما فيه طلبات جديدة. 👌</p>';
-    var hist = coach.history.map(requestCard).join('');
-    return '<div class="shell"><aside class="side"><div class="side-head"><img src="' + LOGO + '" alt=""><div><b>أكاديمية عزم</b><span>' + (profile.role === 'support' ? 'الدعم الفني' : 'لوحة المدرب') + '</span></div></div><nav aria-label="لوحة المدرب">' + nav + '</nav></aside>' +
-      '<main class="main"><div class="topbar"><div class="who"><img src="' + LOGO + '" alt="أكاديمية عزم"><div><h1>' + esc(profile.full_name) + '<span class="role-badge">' + ROLE_NAMES[profile.role] + '</span></h1><p class="num">' + esc(profile.username) + '</p></div></div>' +
-      '<div class="prow-actions"><button class="btn btn-ghost btn-sm" type="button" data-refresh>تحديث</button><button class="btn btn-ghost btn-sm" type="button" data-logout>خروج</button></div></div>' +
-      '<h2 class="page-title">طلبات التسجيل</h2><p class="muted" style="margin-bottom:14px">طابق رقم طلب سلة مع لوحة سلة، وبعدها وافق أو ارفض. الرفض يحتاج سبب يوصل لولي الأمر.</p>' +
-      '<div class="plist">' + cards + '</div>' +
-      (hist ? '<h4 class="report-sub" style="margin-top:22px">آخر الطلبات اللي اتخذت فيها قرار</h4><div class="plist">' + hist + '</div>' : '') +
-      '</main></div>';
+  function loadNewPlayers() {
+    staffView = 'new';
+    loadingView();
+    return Promise.all([loadGroups(), fetchNewPlayers()]).then(function () {
+      var cards = coach.newPlayers.map(newPlayerCard).join('') || '<p class="empty">ما فيه مشتركين جدد ينتظرون. 👌</p>';
+      show(staffShell('المشتركين الجدد', 'حسابات فعّلها الدعم الفني. حدد لكل لاعب مجموعته ونوع اشتراكه وبدايته ونهايته، وبعدها تظهر التفاصيل والمواعيد في حساب ولي الأمر.',
+        (coach.groups.length ? '' : '<div class="reject-box"><span>ما فيه مجموعات مربوطة بحسابك</span><p>تواصل مع الدعم الفني يربطك بمجموعة.</p></div>') + '<div class="plist">' + cards + '</div>'));
+    });
   }
+  function refreshStaff() { return staffView === 'new' ? loadNewPlayers() : loadCoachRequests(); }
+
+  function ageText(birth) { var a = ageOf(birth); return a == null ? '' : 'العمر <span class="num">' + a + '</span> ' + (a >= 3 && a <= 10 ? 'سنوات' : 'سنة'); }
   function requestCard(r) {
     var g = r.parent || {}, k = KIND[r.kind] || ['طلب', 'st-off'];
     var kids = (r.request_players || []).map(function (rp) {
       var p = rp.players; if (!p) return '';
-      var a = ageOf(p.birth_date), sg = coach.groups.filter(function (x) { return x.id === suggestGroup(p.birth_date); })[0];
-      return '<li><b>' + esc(p.full_name) + '</b><span>' + (a != null ? 'العمر <span class="num">' + a + '</span> ' + (a >= 3 && a <= 10 ? 'سنوات' : 'سنة') + ' · ' : '') + (r.status === 'pending' && sg ? 'المقترح: ' + esc(sg.name) : '') + (p.health_notes ? ' · ملاحظة صحية: ' + esc(p.health_notes) : '') + '</span></li>';
+      return '<li><b>' + esc(p.full_name) + '</b><span>' + ageText(p.birth_date) + (p.health_notes ? ' · ملاحظة صحية: ' + esc(p.health_notes) : '') + '</span></li>';
     }).join('');
     var foot = r.status === 'pending'
-      ? '<div class="prow-actions"><button class="btn btn-gold btn-sm" type="button" data-approve="' + r.id + '">موافقة وتفعيل</button><button class="btn btn-danger btn-sm" type="button" data-reject="' + r.id + '">رفض</button>' +
-        (r.receipt_path ? '<button class="btn btn-ghost btn-sm" type="button" data-receipt="' + esc(r.receipt_path) + '">صورة الإيصال</button>' : '') +
+      ? '<div class="prow-actions"><button class="btn btn-gold btn-sm" type="button" data-activate="' + r.id + '">تفعيل الحساب</button><button class="btn btn-danger btn-sm" type="button" data-reject="' + r.id + '">رفض</button>' +
         (g.phone ? '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="' + esc(waLink(g.phone, 'أهلًا ' + (g.full_name || ''))) + '">واتساب</a>' : '') + '</div>'
-      : '<p class="muted">' + (r.status === 'approved' ? '✓ تمت الموافقة' : '✗ رُفض: ' + esc(r.reject_reason)) + (r.reviewed_at ? ' · ' + stamp(r.reviewed_at) : '') + '</p>';
-    return '<article class="req' + (r.status !== 'pending' ? ' done' : '') + '"><div class="prow-top"><span class="avatar">' + esc((g.full_name || '؟').charAt(0)) + '</span><div><h4>' + esc(g.full_name || '') + '</h4><p class="muted"><span class="num">' + esc(g.username || '') + '</span>' + (g.phone ? ' · <span class="num">' + esc(g.phone) + '</span>' : '') + '</p></div><span class="st ' + k[1] + '">' + k[0] + '</span></div>' +
+      : '<p class="muted">' + (r.status === 'approved' ? '✓ تم التفعيل' : '✗ رُفض: ' + esc(r.reject_reason)) + (r.reviewed_at ? ' · ' + stamp(r.reviewed_at) : '') + '</p>';
+    return '<article class="req' + (r.status !== 'pending' ? ' done' : '') + '"><div class="prow-top"><span class="avatar">' + esc((g.full_name || '؟').charAt(0)) + '</span><div><h4>' + esc(g.full_name || '') + '</h4><p class="muted"><span class="num">' + esc(g.phone || g.username || '') + '</span></p></div><span class="st ' + k[1] + '">' + k[0] + '</span></div>' +
       '<ul class="req-kids">' + kids + '</ul>' +
-      '<div class="req-order"><span>رقم طلب سلة</span><b class="num">' + esc(r.salla_order_no) + '</b>' + (r.receipt_path ? '<span class="st st-ok">مع إيصال</span>' : '<span class="st st-off">بدون إيصال</span>') + '<span class="muted req-at">' + stamp(r.created_at) + '</span></div>' + foot + '</article>';
+      (r.salla_order_no ? '<div class="req-order"><span>رقم طلب سلة</span><b class="num">' + esc(r.salla_order_no) + '</b><span class="st st-ok">موجود في قائمة سلة</span>'
+        : '<div class="req-order"><span>طريقة الدفع</span><b>' + esc(PAY_NAMES[r.payment_method] || '—') + '</b><span class="st st-warn">تأكد من استلام المبلغ</span>') + '<span class="muted req-at">' + stamp(r.created_at) + '</span></div>' + foot + '</article>';
   }
   function findRequest(id) { return coach.requests.filter(function (r) { return r.id === id; })[0]; }
+  function playerRequest(p) {
+    var rs = (p.request_players || []).map(function (rp) { return rp.registration_requests; }).filter(function (x) { return x && x.status === 'approved'; });
+    return rs[0] || {};
+  }
+  function newPlayerCard(p) {
+    var g = p.parent || {}, rq = playerRequest(p), sg = coach.groups.filter(function (x) { return x.id === suggestGroup(p.birth_date); })[0];
+    return '<article class="req"><div class="prow-top"><span class="avatar">' + esc(p.full_name.charAt(0)) + '</span><div><h4>' + esc(p.full_name) + '</h4><p class="muted">' + ageText(p.birth_date) + (sg ? ' · المقترح: ' + esc(sg.name) : '') + '</p></div><span class="st st-warn">بدون اشتراك</span></div>' +
+      '<ul class="req-kids"><li><b>ولي الأمر</b><span>' + esc(g.full_name || '') + ' · <span class="num">' + esc(g.phone || g.username || '') + '</span></span></li>' +
+      '<li><b>الدفع</b><span>' + (rq.salla_order_no ? 'سلة · طلب رقم <span class="num">' + esc(rq.salla_order_no) + '</span>' : esc(PAY_NAMES[rq.payment_method] || '—')) + (rq.reviewed_at ? ' · فُعّل ' + stamp(rq.reviewed_at) : '') + '</span></li>' +
+      (p.health_notes ? '<li><b>ملاحظة صحية</b><span>' + esc(p.health_notes) + '</span></li>' : '') + '</ul>' +
+      '<div class="prow-actions"><button class="btn btn-gold btn-sm" type="button" data-assign="' + p.id + '"' + (coach.groups.length ? '' : ' disabled') + '>تحديد الاشتراك</button>' +
+      (g.phone ? '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="' + esc(waLink(g.phone, 'أهلًا ' + (g.full_name || ''))) + '">واتساب</a>' : '') + '</div></article>';
+  }
 
-  function approveModal(r) {
-    var today = iso(new Date()), kids = (r.request_players || []).map(function (rp) { return rp.players; }).filter(Boolean);
-    var groupOpts = function (sel) { return coach.groups.map(function (g) { return '<option value="' + g.id + '"' + (g.id === sel ? ' selected' : '') + '>' + esc(g.name) + '</option>'; }).join(''); };
-    var body = r.kind === 'renewal'
-      ? '<p class="muted">تجديد اشتراك ' + esc(kids.map(function (k) { return k.full_name; }).join('، ')) + ' بعد مطابقة طلب سلة <b class="num">' + esc(r.salla_order_no) + '</b>.</p>'
-      : '<p class="muted">طابقت طلب سلة <b class="num">' + esc(r.salla_order_no) + '</b>؟ اختر مجموعة كل لاعب ونوع اشتراكه.</p>' + kids.map(function (k, i) {
-          return '<div class="kid-box" style="margin-top:12px"><b>' + esc(k.full_name) + '</b><div class="form-grid two" style="margin-top:8px">' +
-            '<div class="field"><label for="ap-g-' + i + '">المجموعة</label><select id="ap-g-' + i + '" data-player="' + k.id + '">' + groupOpts(suggestGroup(k.birth_date)) + '</select></div>' +
-            '<div class="field"><label for="ap-p-' + i + '">نوع الاشتراك</label><select id="ap-p-' + i + '"><option value="offer">عرض التأسيس</option><option value="monthly">شهري</option></select></div></div></div>';
-        }).join('');
-    var m = modal('<h3>موافقة على طلب ' + esc((r.parent || {}).full_name || '') + '</h3>' + body +
-      '<div class="form-grid two" style="margin-top:12px"><div class="field"><label for="ap-start">بداية الاشتراك</label><input id="ap-start" type="date" value="' + today + '"></div><div class="field"><label for="ap-end">نهاية الاشتراك</label><input id="ap-end" type="date" value="' + addMonth(today) + '"><span class="auto">تتحسب تلقائيًا بعد شهر، وتقدر تعدلها.</span></div></div>' +
-      '<p class="form-error" id="ap-error" role="alert"></p><div class="actions"><button class="btn btn-gold btn-block" type="button" id="ap-save">موافقة وتفعيل</button><button class="btn btn-ghost btn-block" type="button" data-close>إلغاء</button></div>');
-    var s = m.querySelector('#ap-start'), e = m.querySelector('#ap-end');
-    s.addEventListener('change', function () { if (s.value) e.value = addMonth(s.value); });
-    m.querySelector('#ap-save').addEventListener('click', function () {
-      var btn = this, err = m.querySelector('#ap-error');
-      if (!s.value || !e.value || e.value < s.value) { err.textContent = 'تأكد من تاريخ البداية والنهاية.'; return; }
-      var assignments = kids.map(function (k, i) { var gs = m.querySelector('#ap-g-' + i), ps = m.querySelector('#ap-p-' + i); return gs ? { player_id: k.id, group_id: gs.value, plan: ps.value } : null; }).filter(Boolean);
-      busy(btn, true, 'جاري التفعيل…');
-      sb.rpc('approve_request', { p_request: r.id, p_start: s.value, p_end: e.value, p_assignments: assignments }).then(function (res) {
-        if (res.error) { busy(btn, false); console.error(res.error); err.textContent = /not your group/.test(res.error.message) ? 'هذي المجموعة مش مربوطة بحسابك.' : friendly(res.error); return; }
-        var g = r.parent || {}, names = kids.map(function (k) { return k.full_name; }).join(' و');
+  function activateModal(r) {
+    var g = r.parent || {}, names = (r.request_players || []).map(function (rp) { return rp.players && rp.players.full_name; }).filter(Boolean).join(' و');
+    var m = modal('<h3>تفعيل حساب ' + esc(g.full_name || '') + '</h3><p class="muted">' + (r.salla_order_no ? 'رقم طلب سلة <b class="num">' + esc(r.salla_order_no) + '</b> موجود في القائمة.' : 'تأكدت من استلام المبلغ (' + esc(PAY_NAMES[r.payment_method] || '') + ')؟') +
+      ' بعد التفعيل يدخل ولي الأمر حسابه، ويظهر ' + esc(names) + ' عند المدرب في «المشتركين الجدد» ليحدد المجموعة ومدة الاشتراك.</p>' +
+      '<p class="form-error" id="ac-error" role="alert"></p><div class="actions"><button class="btn btn-gold btn-block" type="button" id="ac-save">تفعيل الحساب</button><button class="btn btn-ghost btn-block" type="button" data-close>إلغاء</button></div>');
+    m.querySelector('#ac-save').addEventListener('click', function () {
+      var btn = this; busy(btn, true, 'جاري التفعيل…');
+      sb.rpc('activate_request', { p_request: r.id }).then(function (res) {
+        if (res.error) { busy(btn, false); console.error(res.error); m.querySelector('#ac-error').textContent = friendly(res.error); return; }
         closeModal();
         loadCoachRequests().then(function () {
-          waModal('تم التفعيل', 'أرسل لولي الأمر إن حسابه صار جاهز.', g.phone,
-            'أهلًا ' + (g.full_name || '') + '،\n' + (r.kind === 'renewal' ? 'تم تجديد اشتراك ' + names + ' حتى ' + fmt(e.value) + '.' : 'تم قبول تسجيل ' + names + ' في أكاديمية عزم، وحسابك صار مفعّل.') +
-            '\nادخل البوابة باسم المستخدم ' + (g.username || '') + ': ' + PORTAL_URL);
+          waModal('تم تفعيل الحساب', 'أرسل لولي الأمر إن حسابه صار جاهز.', g.phone,
+            'أهلًا ' + (g.full_name || '') + '،\nتم تفعيل حسابك في أكاديمية عزم.\nادخل البوابة ' + (validPhone(g.username || '') ? 'برقم جوالك ' : 'باسم المستخدم ') + (g.username || '') + ': ' + PORTAL_URL +
+            '\nالمدرب يحدد مجموعة ' + names + ' ومواعيد الحصص، وتظهر لك في حسابك.');
+        });
+      });
+    });
+  }
+  function assignModal(p) {
+    var today = iso(new Date()), sel = suggestGroup(p.birth_date);
+    var m = modal('<h3>اشتراك ' + esc(p.full_name) + '</h3><p class="muted">' + ageText(p.birth_date) + '</p>' +
+      '<div class="form-grid two" style="margin-top:12px"><div class="field"><label for="as-g">المجموعة</label><select id="as-g">' + coach.groups.map(function (g) { return '<option value="' + g.id + '"' + (g.id === sel ? ' selected' : '') + '>' + esc(g.name) + '</option>'; }).join('') + '</select><span class="auto" id="as-slots"></span></div>' +
+      '<div class="field"><label for="as-p">نوع الاشتراك</label><select id="as-p"><option value="offer">عرض التأسيس</option><option value="monthly">شهري</option></select></div>' +
+      '<div class="field"><label for="as-start">بداية الاشتراك</label><input id="as-start" type="date" value="' + today + '"></div>' +
+      '<div class="field"><label for="as-end">نهاية الاشتراك</label><input id="as-end" type="date" value="' + addMonth(today) + '"><span class="auto">تتحسب تلقائيًا بعد شهر، وتقدر تعدلها.</span></div></div>' +
+      '<p class="form-error" id="as-error" role="alert"></p><div class="actions"><button class="btn btn-gold btn-block" type="button" id="as-save">حفظ الاشتراك</button><button class="btn btn-ghost btn-block" type="button" data-close>إلغاء</button></div>');
+    var gs = m.querySelector('#as-g'), s = m.querySelector('#as-start'), e = m.querySelector('#as-end');
+    function group() { return coach.groups.filter(function (g) { return g.id === gs.value; })[0] || {}; }
+    function showSlots() { m.querySelector('#as-slots').textContent = slotsText(group().group_slots) || 'ما فيه مواعيد مسجلة لهذي المجموعة.'; }
+    gs.addEventListener('change', showSlots); showSlots();
+    s.addEventListener('change', function () { if (s.value) e.value = addMonth(s.value); });
+    m.querySelector('#as-save').addEventListener('click', function () {
+      var btn = this, err = m.querySelector('#as-error'), plan = m.querySelector('#as-p').value;
+      if (!s.value || !e.value || e.value < s.value) { err.textContent = 'تأكد من تاريخ البداية والنهاية.'; return; }
+      busy(btn, true, 'جاري الحفظ…');
+      sb.rpc('start_subscription', { p_player: p.id, p_group: gs.value, p_plan: plan, p_start: s.value, p_end: e.value }).then(function (res) {
+        if (res.error) { busy(btn, false); console.error(res.error); err.textContent = /not your group/.test(res.error.message) ? 'هذي المجموعة مش مربوطة بحسابك.' : /not waiting/.test(res.error.message) ? 'اللاعب هذا اتحدد اشتراكه قبل. حدّث القائمة.' : friendly(res.error); return; }
+        var g = p.parent || {}, gr = group(), sl = slotsText(gr.group_slots);
+        closeModal();
+        loadNewPlayers().then(function () {
+          waModal('تم حفظ الاشتراك', 'أرسل لولي الأمر تفاصيل الاشتراك والمواعيد.', g.phone,
+            'أهلًا ' + (g.full_name || '') + '،\nتم تسجيل ' + p.full_name + ' في مجموعة ' + (gr.name || '') + ' بأكاديمية عزم.' +
+            '\nالاشتراك (' + PLAN_NAMES[plan] + ') من ' + fmt(s.value) + ' إلى ' + fmt(e.value) + '.' +
+            (sl ? '\nمواعيد الحصص: ' + sl + '.' : '') + '\nالمكان: ' + VENUE + ' ' + MAP_URL +
+            '\nتفاصيل الاشتراك في حسابك: ' + PORTAL_URL);
         });
       });
     });
@@ -526,25 +702,17 @@
       });
     });
   }
-  function receiptModal(path) {
-    var m = modal('<h3>صورة الإيصال</h3><div class="receipt-ph" id="rc-box"><div class="spinner"></div></div><div class="actions"><button class="btn btn-ghost btn-block" type="button" data-close>إغلاق</button></div>');
-    sb.storage.from('receipts').createSignedUrl(path, 300).then(function (res) {
-      var box = m.querySelector('#rc-box'); if (!box) return;
-      if (res.error) { box.textContent = 'تعذّر فتح الصورة.'; return; }
-      box.style.height = 'auto'; box.innerHTML = '<img src="' + esc(res.data.signedUrl) + '" alt="صورة إيصال سلة" style="max-width:100%;border-radius:10px">';
-    });
-  }
-
   document.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-approve], [data-reject], [data-receipt], [data-refresh], [data-support-home]');
+    var t = e.target.closest('[data-activate], [data-assign], [data-reject], [data-refresh], [data-support-home], [data-staff-view]');
     if (!t) return;
     if (t.hasAttribute('data-support-home')) {
       if (profile && profile.role === 'support' && window.AZM_SUPPORT) openSupport();
     }
-    else if (t.dataset.approve) approveModal(findRequest(t.dataset.approve));
+    else if (t.dataset.staffView) { e.preventDefault(); if (t.dataset.staffView === 'new') loadNewPlayers(); else loadCoachRequests(); }
+    else if (t.dataset.activate) activateModal(findRequest(t.dataset.activate));
+    else if (t.dataset.assign) assignModal(coach.newPlayers.filter(function (p) { return p.id === t.dataset.assign; })[0]);
     else if (t.dataset.reject) rejectModal(findRequest(t.dataset.reject));
-    else if (t.dataset.receipt) receiptModal(t.dataset.receipt);
-    else loadCoachRequests();
+    else refreshStaff();
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 

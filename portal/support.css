@@ -69,3 +69,7 @@
   .support-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .support-stat { padding: 11px; }
 }
+.salla-add { margin-bottom: 18px; padding: 14px; border: 1px solid #d5a63e55; border-radius: 12px; background: #2c382533; }
+.salla-add > div { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.salla-add input { width: min(100%, 260px); font-size: 1.05rem; letter-spacing: .04em; }
+.support-note { color: var(--text-soft); font-size: .84rem; line-height: 1.7; }
