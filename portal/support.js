@@ -39,12 +39,14 @@
     audit_log: ['سجل العمليات', 'id', 'action', { at: 'الوقت', action: 'العملية', entity: 'القسم', actor_id: 'المنفّذ', entity_id: 'معرّف السجل', details: 'التفاصيل' }],
     login_events: ['محاولات الدخول', 'at,id', 'username_tried', { at: 'الوقت', username_tried: 'اسم المستخدم', success: 'نجحت', user_id: 'الحساب' }],
     staff_permissions: ['صلاحيات المشرفين', 'user_id,section', null, { user_id: 'حساب المشرف', section: 'القسم' }],
+    problems: ['المشاكل'],
+    pricing: ['الأسعار والمواعيد'],
     settings: ['إعدادات المنصة', 'key', 'key', { key: 'الإعداد', value: 'القيمة', updated_at: 'آخر تعديل', updated_by: 'عدّله' }]
   };
   const navigation = [
     ['الدعم والتشغيل', ['salla_orders', 'registration_requests', 'profiles', 'activation_codes', 'request_players', 'audit_log', 'login_events']],
     ['الأكاديمية', ['players', 'groups', 'group_slots', 'subscriptions', 'payments', 'sessions', 'attendance', 'monthly_reports', 'announcements']],
-    ['الإدارة', ['staff_permissions', 'settings']]
+    ['الإدارة', ['pricing', 'staff_permissions', 'settings']]
   ];
   const compositeKeys = new Set(['request_players', 'attendance', 'staff_permissions', 'settings']);
   const names = {
@@ -122,7 +124,7 @@
     return (compositeKeys.has(area) ? fields : ['id', ...fields]).join(',');
   }
 
-  function open({ sb, profile, root, toast, requests }) {
+  function open({ sb, profile, root, toast, requests, newPlayers, viewAs }) {
     if (profile.role !== 'support' || profile.status !== 'active') return Promise.resolve();
     const current = { area: 'overview', search: '', profileField: 'full_name', page: 0, version: 0, rows: [], names: {}, total: 0, pending: false };
     root.innerHTML = '<div class="support-shell"><header class="support-head"><div class="support-brand">' +
@@ -130,7 +132,7 @@
       '<div class="support-identity"><span><b>' + escapeHtml(profile.full_name) + '</b><small dir="ltr">' + escapeHtml(profile.username) +
       '</small></span><button type="button" class="btn btn-ghost btn-sm" data-logout>خروج</button></div></header>' +
       '<div class="support-layout"><aside class="support-sidebar"><nav aria-label="أقسام الدعم الفني">' +
-      '<button type="button" data-area="overview">نظرة عامة</button>' +
+      '<button type="button" data-area="overview">نظرة عامة</button><button type="button" data-area="problems">المشاكل</button>' +
       navigation.map(([label, items]) => '<p>' + label + '</p>' + items.map(area =>
         '<button type="button" data-area="' + area + '">' + areas[area][0] + '</button>').join('')).join('') +
       '</nav></aside><main class="support-main" id="support-content"></main></div>' +
@@ -165,7 +167,8 @@
       }));
       body.innerHTML = '<div class="support-stats">' + result.join('') +
         '</div><div class="support-quick"><h3>الإجراءات السريعة</h3><div class="support-actions">' +
-        '<button type="button" class="btn btn-gold btn-sm" data-area="salla_orders">إضافة رقم طلب سلة</button>' +
+        '<button type="button" class="btn btn-gold btn-sm" data-area="problems">المشاكل</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" data-area="salla_orders">إضافة رقم طلب سلة</button>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-create-invite>إصدار رمز تفعيل</button>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-area="profiles">البحث عن حساب</button>' +
         '<button type="button" class="btn btn-ghost btn-sm" data-support-requests>مراجعة طلبات التسجيل</button>' +
@@ -238,6 +241,12 @@
         else button.removeAttribute('aria-current');
       }
       let body;
+      if (area === 'problems' || area === 'pricing') {
+        body = heading(areas[area][0]);
+        try { await (area === 'problems' ? problems(body) : pricing(body)); }
+        catch (error) { console.error(error); if (version === current.version) body.textContent = 'تعذّر تحميل هذا القسم. جرّب التحديث.'; }
+        return;
+      }
       if (area === 'overview') {
         body = heading('نظرة عامة');
         try { await overview(body); }
@@ -315,6 +324,9 @@
         actions = items.map(action => '<button class="btn btn-ghost btn-sm" type="button" data-account-action="' +
           action + '">' + accountActions[action][0] + '</button>').join('');
       }
+      if (current.area === 'profiles' && row.role !== 'support' && viewAs) {
+        actions = '<button class="btn btn-gold btn-sm" type="button" data-view-as="' + row.id + '">فتح لوحته</button>' + actions;
+      }
       if (current.area === 'salla_orders' && row.status === 'available') {
         actions = '<button class="btn btn-danger btn-sm" type="button" data-salla-delete>حذف الرقم</button>';
       }
@@ -350,6 +362,187 @@
         escapeHtml(value) + '</textarea><button type="button" class="btn btn-gold" data-support-copy>نسخ</button></div>');
     }
 
+    /* ---------- قسم «المشاكل»: اكتشاف المشاكل المتوقعة وحلها من اللوحة ---------- */
+    const DAY = 864e5;
+    const weekdays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    function ago(ts) {
+      const days = Math.floor((Date.now() - new Date(ts).getTime()) / DAY);
+      if (days >= 1) return 'من ' + days + (days === 1 ? ' يوم' : days === 2 ? ' يومين' : days <= 10 ? ' أيام' : ' يوم');
+      const hours = Math.floor((Date.now() - new Date(ts).getTime()) / 36e5);
+      return hours >= 1 ? 'من ' + hours + ' ساعة' : 'من شوية';
+    }
+    function wa(mobile, text) { return 'https://wa.me/966' + String(mobile).slice(1) + '?text=' + encodeURIComponent(text); }
+    function mobileOf(p) { const m = phone((p && (p.phone || p.username)) || ''); return /^05\d{8}$/.test(m) ? m : null; }
+    function waAction(p, text) { const m = mobileOf(p); return m ? { label: 'واتساب', href: wa(m, text), wa: true } : null; }
+    function todayRiyadh() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh' }).format(new Date()); }
+
+    async function findProblems() {
+      const nowIso = new Date().toISOString();
+      const q = await Promise.all([
+        sb.from('profiles').select('id, full_name, username, phone, status, created_at').eq('role', 'parent').in('status', ['pending', 'rejected']),
+        sb.from('registration_requests').select('id, parent_id, status, created_at').in('status', ['pending', 'rejected']),
+        sb.from('players').select('id, full_name, created_at, parent:profiles!players_parent_id_fkey(id, full_name, username, phone, status), request_players(registration_requests(status, reviewed_at))').eq('status', 'pending').is('group_id', null),
+        sb.from('salla_orders').select('id, order_no, phone, created_at').eq('status', 'available'),
+        sb.from('subscriptions').select('player_id, end_date, plan, players(id, full_name, status, parent:profiles!players_parent_id_fkey(id, full_name, username, phone))').order('end_date', { ascending: false }),
+        sb.from('profiles').select('id, full_name, username, role, status, failed_logins, locked_until').or('locked_until.gt."' + nowIso + '",failed_logins.gte.3'),
+        sb.from('activation_codes').select('id, label, role, expires_at, used_at, revoked_at').is('used_at', null).is('revoked_at', null),
+        sb.from('groups').select('id, name, coach_id, group_slots(id)').eq('is_active', true),
+        sb.from('salla_order_misses').select('order_no, tries, first_at, last_at').order('last_at', { ascending: false })
+      ]);
+      const failed = q.filter(r => r.error);
+      const [parents, reqs, waiting, orders, subs, locked, codes, groups, misses] = q.map(r => r.data || []);
+      const list = [];
+      const add = (level, title, detail, actions) => list.push({ level, title, detail, actions: actions.filter(Boolean) });
+
+      // أرقام طلبات جرّبها أولياء أمور وما لقوها
+      for (const m of misses) {
+        add('high', 'ولي أمر حاول يسجّل برقم طلب مش موجود: ' + m.order_no,
+          'اتجرّب ' + (m.tries === 1 ? 'مرة' : m.tries === 2 ? 'مرتين' : m.tries + ' مرات') + '، آخرها ' + ago(m.last_at) + '. لو الطلب مدفوع في سلة أضفه، وولي الأمر يقدر يكمّل على طول.',
+          [{ label: 'إضافة الرقم', run: () => addMissing(m.order_no), primary: true }, { label: 'تجاهل', run: () => dismissMiss(m.order_no) }]);
+      }
+      // طلبات تسجيل مستنية التفعيل
+      const pendingReqs = reqs.filter(r => r.status === 'pending');
+      for (const r of pendingReqs) {
+        if (Date.now() - new Date(r.created_at).getTime() < DAY) continue;
+        const p = parents.find(x => x.id === r.parent_id) || {};
+        add('high', 'طلب تسجيل مستني التفعيل ' + ago(r.created_at) + (p.full_name ? ': ' + p.full_name : ''),
+          'ولي الأمر مستني. فعّل الحساب أو ارفضه بسبب.',
+          [{ label: 'مراجعة الطلبات', run: () => requests(), primary: true }, p.id && viewAs ? { label: 'فتح لوحته', run: () => viewAs(p.id) } : null]);
+      }
+      // حساب اتعمل وما كمّل طلب التسجيل
+      for (const p of parents) {
+        if (reqs.some(r => r.parent_id === p.id)) continue;
+        add('mid', (p.full_name || p.username) + ' عمل حساب وما أرسل طلب التسجيل',
+          'الحساب اتعمل ' + ago(p.created_at) + '. غالبًا وقف عند خطوة البيانات أو رقم الطلب.',
+          [waAction(p, 'أهلًا ' + (p.full_name || '') + '،\nمعك الدعم الفني لأكاديمية عزم. لاحظنا إن تسجيلك ما اكتمل.\nادخل حسابك برقم جوالك وكمّل طلب تسجيل ابنك: ' + signupUrl.replace('#signup', '') + '\nولو واجهتك مشكلة رد علينا هنا.'),
+           viewAs ? { label: 'فتح لوحته', run: () => viewAs(p.id) } : null]);
+      }
+      // أبناء مستنيين المدرب يحدد اشتراكهم
+      for (const pl of waiting) {
+        const g = pl.parent || {};
+        if (g.status !== 'active') continue;
+        const ok = (pl.request_players || []).map(x => x.registration_requests).filter(x => x && x.status === 'approved');
+        const at = ok.map(x => x.reviewed_at).filter(Boolean).sort().pop();
+        if (!at || Date.now() - new Date(at).getTime() < 2 * DAY) continue;
+        add('mid', pl.full_name + ' مستني تحديد الاشتراك ' + ago(at),
+          'الحساب اتفعّل والمدرب ما حدد المجموعة ومدة الاشتراك. حددها إنت أو كلّم المدرب.',
+          [newPlayers ? { label: 'تحديد الاشتراك', run: () => newPlayers(), primary: true } : null, g.id && viewAs ? { label: 'لوحة ولي الأمر', run: () => viewAs(g.id) } : null]);
+      }
+      // أرقام سلة اتضافت ومحدش سجّل بها
+      for (const o of orders) {
+        if (Date.now() - new Date(o.created_at).getTime() < 2 * DAY) continue;
+        add('low', 'رقم طلب ' + o.order_no + ' اتضاف ' + ago(o.created_at) + ' ومحدش سجّل به',
+          o.phone ? 'ابعت رسالة الترحيب تاني لجوال المشترك ' + o.phone + '.' : 'مفيش جوال مسجّل مع الرقم. تواصل مع المشترك من بيانات طلب سلة.',
+          [o.phone ? { label: 'إعادة إرسال الترحيب', href: welcomeLink(o.order_no, o.phone), wa: true } : null]);
+      }
+      // اشتراكات قربت تخلص أو خلصت
+      const today = todayRiyadh(), seen = new Set();
+      for (const s of subs) {
+        if (seen.has(s.player_id)) continue;
+        seen.add(s.player_id);
+        const pl = s.players;
+        if (!pl || pl.status !== 'active') continue;
+        const left = Math.round((new Date(s.end_date) - new Date(today)) / DAY);
+        if (left > 7 || left < -30) continue;
+        const g = pl.parent || {};
+        const text = 'أهلًا ' + (g.full_name || '') + '،\nمعك الدعم الفني لأكاديمية عزم.\n' + (left < 0 ? 'اشتراك ' + pl.full_name + ' انتهى يوم ' + s.end_date + '.' : 'اشتراك ' + pl.full_name + ' بينتهي يوم ' + s.end_date + '.') +
+          '\nتقدر تجدّد من متجر سرج (سلة): ' + (window.AZM_CONFIG && window.AZM_CONFIG.sallaUrl || '') + '\nوبعد الدفع ابعت لنا رقم الطلب.';
+        add(left < 0 ? 'high' : 'mid', (left < 0 ? 'اشتراك ' + pl.full_name + ' خلص من ' + (-left) + ' يوم' : left === 0 ? 'اشتراك ' + pl.full_name + ' بيخلص النهارده' : 'اشتراك ' + pl.full_name + ' بيخلص بعد ' + left + ' يوم'),
+          'آخر اشتراك ينتهي ' + s.end_date + '. ذكّر ولي الأمر بالتجديد.',
+          [waAction(g, text), g.id && viewAs ? { label: 'فتح لوحته', run: () => viewAs(g.id) } : null]);
+      }
+      // حسابات مقفولة أو عليها محاولات دخول غلط
+      for (const p of locked) {
+        if (p.role === 'support') continue;
+        const isLocked = p.locked_until && new Date(p.locked_until) > new Date();
+        add(isLocked ? 'high' : 'low', (p.full_name || p.username) + (isLocked ? ' حسابه مقفول' : ' عنده ' + p.failed_logins + ' محاولات دخول غلط'),
+          'غالبًا ناسي كلمة المرور. ارفع القفل، أو ابعت له رابط استعادة بعد ما تتأكد إنه صاحب الحساب.',
+          [{ label: 'رفع القفل', run: () => accountConfirmation(p, 'unlock'), primary: true }, { label: 'رابط استعادة', run: () => accountConfirmation(p, 'recovery') }]);
+      }
+      // رموز تفعيل الطاقم
+      for (const c of codes) {
+        if (!['coach', 'super_admin'].includes(c.role)) continue;
+        const left = (new Date(c.expires_at) - Date.now()) / DAY;
+        if (left > 2) continue;
+        add(left < 0 ? 'mid' : 'low', 'رمز تفعيل ' + c.label + ' (' + labels[c.role] + ') ' + (left < 0 ? 'خلص وما اتستخدمش' : 'بيخلص قريب وما اتستخدمش'),
+          'لو صاحبه لسه محتاج يفعّل حسابه، استبدله برمز جديد بنفس الصلاحيات وابعته له.',
+          [{ label: 'استبدال الرمز', run: () => inviteConfirmation(c, 'replace'), primary: true }]);
+      }
+      // مجموعات ناقصة
+      for (const g of groups) {
+        if (g.coach_id && (g.group_slots || []).length) continue;
+        add('mid', 'مجموعة ' + g.name + (g.coach_id ? ' مالهاش مواعيد' : ' مالهاش مدرب'),
+          g.coach_id ? 'أولياء الأمور مش هيشوفوا مواعيد الحصص.' : 'المدرب مش هيلاقي لاعبيها في «المشتركين الجدد».',
+          [{ label: 'ظبّط المجموعة', run: () => load('pricing'), primary: true }]);
+      }
+      const order = { high: 0, mid: 1, low: 2 };
+      list.sort((a, b) => order[a.level] - order[b.level]);
+      return { list, failed: failed.length };
+    }
+
+    function setProblemCount(n) {
+      const button = shell.querySelector('.support-sidebar [data-area="problems"]');
+      if (button) button.innerHTML = 'المشاكل' + (n ? ' <em class="support-count">' + n + '</em>' : '');
+    }
+    async function problems(body) {
+      body.textContent = 'نفحص المنصة…';
+      const { list, failed } = await findProblems();
+      current.issues = list;
+      setProblemCount(list.length);
+      const levelName = { high: ['عاجل', 'st-bad'], mid: ['مهم', 'st-warn'], low: ['متابعة', 'st-info'] };
+      body.innerHTML = (failed ? '<p class="form-error">تعذّر فحص جزء من البيانات. جرّب «تحديث».</p>' : '') +
+        (list.length ? '<p class="support-note">' + list.length + (list.length === 1 ? ' مشكلة' : ' مشاكل') + '. كل مشكلة جنبها الحل، ولما تتحل تختفي بعد «تحديث».</p><div class="issue-list">' + list.map((it, i) =>
+          '<article class="issue issue-' + it.level + '"><div class="issue-head"><span class="st ' + levelName[it.level][1] + '">' + levelName[it.level][0] + '</span><h3>' + escapeHtml(it.title) + '</h3></div>' +
+          '<p>' + escapeHtml(it.detail) + '</p>' + (it.actions.length ? '<div class="support-actions">' + it.actions.map((a, j) => a.href
+            ? '<a class="btn ' + (a.wa ? 'btn-wa' : 'btn-ghost') + ' btn-sm" target="_blank" rel="noopener" href="' + escapeHtml(a.href) + '">' + escapeHtml(a.label) + '</a>'
+            : '<button type="button" class="btn ' + (a.primary ? 'btn-gold' : 'btn-ghost') + ' btn-sm" data-fix="' + i + '-' + j + '">' + escapeHtml(a.label) + '</button>').join('') + '</div>' : '') + '</article>').join('') + '</div>'
+          : '<p class="support-empty">مفيش مشاكل دلوقتي 👌</p>');
+    }
+    async function addMissing(order) {
+      const { error } = await sb.from('salla_orders').insert({ order_no: order });
+      toast(error ? (error.code === '23505' ? 'الرقم مسجّل قبل كذا' : 'تعذّر إضافة الرقم') : 'تمت إضافة الرقم ' + order);
+      load();
+    }
+    async function dismissMiss(order) {
+      const { error } = await sb.from('salla_order_misses').delete().eq('order_no', order);
+      toast(error ? 'تعذّر التجاهل' : 'اتشال من القائمة');
+      load();
+    }
+
+    /* ---------- قسم «الأسعار والمواعيد» ---------- */
+    async function pricing(body) {
+      body.textContent = 'جاري التحميل…';
+      const [settings, groupsRes, coaches] = await Promise.all([
+        sb.from('settings').select('key, value'),
+        sb.from('groups').select('id, name, coach_id, is_active, group_slots(id, weekday, start_time, end_time)').order('name'),
+        sb.from('profiles').select('id, full_name, username').eq('role', 'coach').eq('status', 'active')
+      ]);
+      if (settings.error || groupsRes.error || coaches.error) throw settings.error || groupsRes.error || coaches.error;
+      const value = key => { const row = settings.data.find(s => s.key === key); return row ? row.value : ''; };
+      const coachOptions = sel => '<option value="">— بدون مدرب —</option>' + coaches.data.map(c => '<option value="' + c.id + '"' + (c.id === sel ? ' selected' : '') + '>' + escapeHtml(c.full_name || c.username) + '</option>').join('');
+      const t = v => String(v).slice(0, 5);
+      const dayOptions = [6, 0, 1, 2, 3, 4, 5].map(d => '<option value="' + d + '">' + weekdays[d] + '</option>').join('');
+      body.innerHTML =
+        '<form class="support-form price-form" data-command="prices"><h3>الأسعار</h3>' +
+        '<p class="support-note">تُستخدم في حساب الدفعات والتقارير المالية. أسعار الصفحة الرئيسية للموقع مكتوبة في التصميم ومش بتتغير من هنا.</p><div class="price-grid">' +
+        '<label>الاشتراك الشهري (ريال)<input name="price" type="number" min="1" max="10000" step="1" required value="' + escapeHtml(value('price')) + '"></label>' +
+        '<label>عرض التأسيس (ريال)<input name="offer_price" type="number" min="1" max="10000" step="1" required value="' + escapeHtml(value('offer_price')) + '"></label>' +
+        '<label>مقاعد العرض<input name="offer_seats" type="number" min="0" max="1000" step="1" required value="' + escapeHtml(value('offer_seats')) + '"></label></div>' +
+        '<p role="alert" class="form-error"></p><button class="btn btn-gold btn-sm">حفظ الأسعار</button></form>' +
+        '<h3 class="groups-title">المجموعات والمواعيد</h3>' +
+        groupsRes.data.map(g => {
+          const slots = (g.group_slots || []).slice().sort((a, b) => (a.weekday + 1) % 7 - (b.weekday + 1) % 7 || (a.start_time < b.start_time ? -1 : 1));
+          return '<section class="group-box' + (g.is_active ? '' : ' inactive') + '"><header><h4>' + escapeHtml(g.name) + (g.is_active ? '' : ' <span class="st st-off">متوقفة</span>') + '</h4></header>' +
+            '<form class="support-form inline-form" data-command="group_coach" data-target="' + g.id + '"><label>المدرب<select name="coach">' + coachOptions(g.coach_id) + '</select></label><button class="btn btn-ghost btn-sm">حفظ المدرب</button><p role="alert" class="form-error"></p></form>' +
+            '<ul class="slot-list">' + (slots.length ? slots.map(s => '<li><span>' + weekdays[s.weekday] + ' · <bdi dir="ltr">' + t(s.start_time) + ' – ' + t(s.end_time) + '</bdi></span><button type="button" class="btn btn-danger btn-sm" data-slot-delete="' + s.id + '">حذف</button></li>').join('') : '<li class="muted">مفيش مواعيد</li>') + '</ul>' +
+            '<form class="support-form inline-form" data-command="slot_add" data-target="' + g.id + '"><label>اليوم<select name="day">' + dayOptions + '</select></label>' +
+            '<label>من<input name="from" type="time" required value="19:00"></label><label>إلى<input name="to" type="time" required value="20:30"></label>' +
+            '<button class="btn btn-ghost btn-sm">إضافة موعد</button><p role="alert" class="form-error"></p></form></section>';
+        }).join('') +
+        '<form class="support-form inline-form group-add" data-command="group_add"><label>مجموعة جديدة<input name="name" required minlength="2" maxlength="40" placeholder="مثال: تحت 8"></label>' +
+        '<label>المدرب<select name="coach">' + coachOptions('') + '</select></label><button class="btn btn-gold btn-sm">إضافة المجموعة</button><p role="alert" class="form-error"></p></form>';
+    }
+
     let detailRow;
     let reloadOnClose = false;
     dialog.addEventListener('close', () => {
@@ -377,6 +570,18 @@
       if (button.hasAttribute('data-create-invite')) inviteForm();
       if (button.dataset.inviteAction && detailRow) inviteConfirmation(detailRow, button.dataset.inviteAction);
       if (button.dataset.accountAction && detailRow) accountConfirmation(detailRow, button.dataset.accountAction);
+      if (button.dataset.viewAs) { const id = button.dataset.viewAs; if (dialog.open) dialog.close(); viewAs(id); return; }
+      if (button.dataset.fix) {
+        const [i, j] = button.dataset.fix.split('-').map(Number);
+        const action = current.issues?.[i]?.actions?.[j];
+        if (action?.run) action.run();
+        return;
+      }
+      if (button.dataset.slotDelete) {
+        if (!window.confirm('تحذف الموعد ده؟ أولياء أمور المجموعة مش هيشوفوه في مواعيدهم.')) return;
+        sb.from('group_slots').delete().eq('id', button.dataset.slotDelete).then(({ error }) => { toast(error ? 'تعذّر حذف الموعد' : 'اتحذف الموعد'); load(); });
+        return;
+      }
       if (button.dataset.paste) {
         const field = shell.querySelector('#' + button.dataset.paste);
         if (!navigator.clipboard?.readText) { field.focus(); toast('اضغط مطوّلًا على الخانة واختر لصق'); return; }
@@ -445,6 +650,42 @@
             '<a class="btn btn-wa" target="_blank" rel="noopener" href="' + escapeHtml(welcomeLink(order, mobile)) + '">أرسل عبر واتساب</a></div>');
           return;
         }
+        if (action === 'prices') {
+          const values = ['price', 'offer_price', 'offer_seats'].map(key => [key, Number(input.get(key))]);
+          if (values.some(([key, v]) => !Number.isInteger(v) || v < (key === 'offer_seats' ? 0 : 1))) { alert.textContent = 'اكتب أرقام صحيحة.'; return; }
+          for (const [key, v] of values) {
+            const res = await sb.from('settings').update({ value: v }).eq('key', key).select('key');
+            if (res.error || !res.data.length) { alert.textContent = 'تعذّر حفظ ' + key + '.'; return; }
+          }
+          toast('تم حفظ الأسعار');
+          load();
+          return;
+        }
+        if (action === 'group_coach') {
+          response = await sb.from('groups').update({ coach_id: input.get('coach') || null }).eq('id', id).select('id');
+          if (response.error || !response.data.length) { alert.textContent = 'تعذّر حفظ المدرب.'; return; }
+          toast('تم حفظ المدرب');
+          load();
+          return;
+        }
+        if (action === 'slot_add') {
+          const from = input.get('from'), to = input.get('to');
+          if (!from || !to || to <= from) { alert.textContent = 'وقت النهاية لازم يكون بعد البداية.'; return; }
+          response = await sb.from('group_slots').insert({ group_id: id, weekday: Number(input.get('day')), start_time: from, end_time: to });
+          if (response.error) { alert.textContent = 'تعذّر إضافة الموعد.'; return; }
+          toast('اتضاف الموعد');
+          load();
+          return;
+        }
+        if (action === 'group_add') {
+          const name = String(input.get('name')).trim();
+          if (name.length < 2) { alert.textContent = 'اكتب اسم المجموعة.'; return; }
+          response = await sb.from('groups').insert({ name, coach_id: input.get('coach') || null });
+          if (response.error) { alert.textContent = 'تعذّر إضافة المجموعة.'; return; }
+          toast('اتضافت المجموعة');
+          load();
+          return;
+        }
         if (action === 'salla_delete') {
           response = await sb.from('salla_orders').delete().eq('id', id).eq('status', 'available').select('id');
           if (response.error) throw response.error;
@@ -480,6 +721,7 @@
         current.pending = submit.disabled = false;
       }
     });
+    findProblems().then(r => setProblemCount(r.list.length), () => {});
     return load();
   }
 

@@ -81,3 +81,28 @@
 .salla-add > .btn-gold { justify-self: start; }
 .salla-phone { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .salla-wa-preview { white-space: pre-wrap; line-height: 1.8; font-size: .88rem; padding: 12px 14px; border-radius: 12px; background: #1f3b2b; border: 1px solid #2fd37a33; }
+
+/* ---------- المشاكل ---------- */
+.support-count { font-style: normal; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-inline-start: 6px; border-radius: 999px; background: #e0644f; color: #fff; font-size: .72rem; font-weight: 800; }
+.issue-list { display: grid; gap: 10px; margin-top: 12px; }
+.issue { padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); border-inline-start: 4px solid var(--line); background: var(--ink-3); display: grid; gap: 8px; }
+.issue-high { border-inline-start-color: #e0644f; }
+.issue-mid { border-inline-start-color: #f3c74f; }
+.issue-low { border-inline-start-color: #4cc3ff; }
+.issue-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.issue-head h3 { font-size: .98rem; line-height: 1.6; }
+.issue p { color: var(--text-soft); font-size: .86rem; line-height: 1.7; }
+
+/* ---------- الأسعار والمواعيد ---------- */
+.price-form, .group-box, .group-add { padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--ink-3); margin-bottom: 14px; }
+.price-form h3, .groups-title { font-size: 1rem; }
+.groups-title { margin: 22px 0 10px; }
+.price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.price-grid label, .inline-form label { display: grid; gap: 4px; font-size: .82rem; color: var(--text-soft); }
+.price-form > .btn-gold { justify-self: start; }
+.group-box header h4 { font-size: 1rem; margin-bottom: 10px; }
+.group-box.inactive { opacity: .7; }
+.inline-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.inline-form .form-error { flex-basis: 100%; }
+.slot-list { list-style: none; display: grid; gap: 6px; margin: 12px 0; padding: 0; }
+.slot-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, .04); font-size: .9rem; }

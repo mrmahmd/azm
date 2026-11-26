@@ -273,7 +273,7 @@
       '<form id="first-form" class="form-grid" novalidate><div class="field"><label for="f-full">الاسم كاملًا</label><input id="f-full" autocomplete="name"></div>' + userField('f-user') + passFields('fp') +
       '<p class="form-error" id="f-error" role="alert"></p><button class="btn btn-gold btn-block" id="f-submit" disabled>حفظ وتفعيل الحساب</button></form>');
   }
-  var ROLE_NAMES = { coach: 'المدرب', super_admin: 'المشرف العام', support: 'الدعم الفني' };
+  var ROLE_NAMES = { parent: 'ولي الأمر', coach: 'المدرب', super_admin: 'المشرف العام', support: 'الدعم الفني' };
   function viewStaffHome() {
     return card(head(null, '', 'أهلًا ' + esc(profile.full_name.split(' ')[0] || ''), 'حسابك مفعّل كـ<b>' + ROLE_NAMES[profile.role] + '</b>.') +
       '<div class="notice-box reject-box" style="border-color:rgba(76,195,255,.45);background:rgba(76,195,255,.08)"><span style="color:var(--blue)">قريبًا</span><p>لوحة ' + ROLE_NAMES[profile.role] + ' قيد التجهيز، وتظهر هنا أول ما تكتمل.</p></div>' + logoutLink());
@@ -303,6 +303,40 @@
       '<a class="btn btn-wa btn-block" style="margin-top:16px" href="' + WA + '" target="_blank" rel="noopener">تواصل مع الأكاديمية</a>' + logoutLink());
   }
 
+  /* ---------- الدعم الفني: فتح لوحة أي مستخدم ----------
+     الدعم يفضل داخل بحسابه، والمنصة تعرض لوحة الشخص زي ما هو شايفها.
+     كل إجراء يتسجّل باسم الدعم الفني في سجل العمليات. */
+  var viewing = null;
+  function viewBar() {
+    var bar = $('viewas-bar');
+    if (!viewing) { if (bar) bar.remove(); return; }
+    if (!bar) { bar = document.createElement('div'); bar.id = 'viewas-bar'; bar.className = 'viewas-bar'; bar.setAttribute('role', 'status'); document.body.insertBefore(bar, $('app')); }
+    bar.innerHTML = '<span>أنت تشاهد لوحة <b>' + esc(profile.full_name || profile.username) + '</b> (' + esc(ROLE_NAMES[profile.role] || '') + ' · <bdi dir="ltr">' + esc(profile.username) + '</bdi>) كدعم فني. أي إجراء يتسجّل باسمك.</span>' +
+      '<button type="button" class="btn btn-gold btn-sm" data-viewas-exit>رجوع للوحة الدعم</button>';
+  }
+  function viewAs(id) {
+    var support = viewing ? viewing.support : profile;
+    if (!support || support.role !== 'support' || support.status !== 'active') return Promise.resolve();
+    loadingView();
+    return sb.from('profiles').select('*').eq('id', id).single().then(function (r) {
+      if (r.error) throw r.error;
+      if (r.data.role === 'support') throw new Error('support profile');
+      viewing = { support: support }; profile = r.data; viewBar();
+      return routeProfile();
+    }).catch(function (e) { console.error(e); exitViewAs(); toast('تعذّر فتح اللوحة'); });
+  }
+  function exitViewAs() {
+    if (viewing) { profile = viewing.support; viewing = null; }
+    viewBar(); closeModal(); return openSupport();
+  }
+  function viewNoRequest(req) {
+    return card(head(null, '', esc(profile.full_name || profile.username), req && req.status === 'rejected' ? 'آخر طلب تسجيل اترفض، وولي الأمر يقدر يعدّل ويرسل من جديد.' : 'عمل حسابه وما أرسل طلب التسجيل لسه.') +
+      (req && req.reject_reason ? '<div class="reject-box"><span>سبب الرفض</span><p>' + esc(req.reject_reason) + '</p></div>' : '') +
+      '<div class="cred"><div><span>رقم الجوال (اسم المستخدم)</span><b class="num">' + esc(profile.username) + '</b></div></div>' +
+      (validPhone(profile.phone || profile.username) ? '<a class="btn btn-wa btn-block" style="margin-top:14px" target="_blank" rel="noopener" href="' + esc(waLink(profile.phone || profile.username, 'أهلًا ' + (profile.full_name || '') + '،\nمعك الدعم الفني لأكاديمية عزم. باقي خطوة وحدة: ادخل حسابك برقم جوالك وكمّل طلب تسجيل ابنك: https://' + PORTAL_URL)) + '">واتساب: كمّل تسجيلك</a>' : ''));
+  }
+  document.addEventListener('click', function (e) { if (e.target.closest('[data-viewas-exit]')) { e.preventDefault(); exitViewAs(); } });
+
   /* ---------- التنقل ---------- */
   function show(html) { $('app').innerHTML = html; window.scrollTo(0, 0); }
   function loadingView() { show('<div class="loading"><div><div class="spinner"></div>جاري التحميل…</div></div>'); }
@@ -314,16 +348,14 @@
     routing = doRoute().then(function () { routing = null; }, function () { routing = null; });
     return routing;
   }
-  function doRoute() {
-    loadingView();
-    return sb.from('profiles').select('*').eq('id', session.user.id).single().then(function (r) {
-      if (r.error) throw r.error;
-      profile = r.data;
+  // الشاشة المناسبة لصاحب الحساب (أو للحساب اللي يشاهده الدعم الفني)
+  function routeProfile() {
+    return Promise.resolve().then(function () {
       // كل واحد يستخدم صفحته: الطاقم من /staff وأولياء الأمور من /portal
-      if (MODE === 'parent' && profile.role !== 'parent') {
+      if (!viewing && MODE === 'parent' && profile.role !== 'parent') {
         show(card(head(null, '', 'هذي صفحة أولياء الأمور', 'حسابك من الطاقم، فادخل من صفحة الطاقم.') + '<a class="btn btn-gold btn-block" href="' + OTHER_PAGE + '">افتح صفحة الطاقم</a>' + logoutLink())); return;
       }
-      if (MODE === 'staff' && profile.role === 'parent') {
+      if (!viewing && MODE === 'staff' && profile.role === 'parent') {
         show(card(head(null, '', 'هذي صفحة الطاقم', 'حسابك ليس مربوطًا بدور في الطاقم. لو أنت ولي أمر، ادخل من صفحة أولياء الأمور، ولو معك رمز تفعيل تواصل مع الدعم الفني.') + '<a class="btn btn-gold btn-block" href="' + OTHER_PAGE + '">صفحة أولياء الأمور</a>' + logoutLink())); return;
       }
       if (profile.role !== 'parent') {
@@ -350,6 +382,15 @@
         reg = { method: null, order: null, reason: req && req.status === 'rejected' ? req.reject_reason : null };
         showReg('method');
       });
+    });
+  }
+  function doRoute() {
+    if (viewing) { viewing = null; viewBar(); }
+    loadingView();
+    return sb.from('profiles').select('*').eq('id', session.user.id).single().then(function (r) {
+      if (r.error) throw r.error;
+      profile = r.data;
+      return routeProfile();
     }).catch(function (e) { console.error(e); show(card(head(null, '', 'تعذّر تحميل حسابك', friendly(e)) + '<button class="btn btn-gold btn-block" data-retry>حاول مرة ثانية</button>' + logoutLink())); });
   }
 
@@ -543,7 +584,7 @@
   function stamp(ts) { var d = new Date(ts); return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' · ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 
   function openSupport() {
-    return window.AZM_SUPPORT.open({ sb: sb, profile: profile, root: $('app'), toast: toast, requests: loadCoachRequests });
+    return window.AZM_SUPPORT.open({ sb: sb, profile: profile, root: $('app'), toast: toast, requests: loadCoachRequests, newPlayers: loadNewPlayers, viewAs: viewAs });
   }
 
   // الدعم الفني يراجع الطلبات ويفعّل الحساب، والمدرب يحدد مجموعة كل لاعب ومدة اشتراكه
@@ -729,6 +770,7 @@
     if (!t) return;
     e.preventDefault();
     if (t.hasAttribute('data-retry')) { routeSignedIn(); return; }
+    if (viewing) { exitViewAs(); return; }
     sb.auth.signOut().then(function () { session = null; profile = null; location.hash = 'login'; render(); });
   });
   window.addEventListener('hashchange', render);
