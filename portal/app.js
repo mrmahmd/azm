@@ -248,7 +248,8 @@
       '<button class="btn btn-gold btn-block" id="s-submit">إرسال طلب التسجيل</button></form>' +
       '<p class="auth-help"><a href="#" data-reg-step="' + (salla ? 'order' : 'method') + '">← رجوع</a></p>' + regFoot());
   }
-  function showReg(step) {
+  function showReg(step, fromHistory) {
+    if (!fromHistory) navPush({ kind: 'reg', step: step || 'method', reg: { method: reg.method, order: reg.order, reason: reg.reason } });
     if (step === 'order') { show(viewOrderStep()); bindOrderStep(); }
     else if (step === 'details') { kidCount = 1; show(viewDetails()); bindDetails(); }
     else { show(viewMethod()); }
@@ -314,20 +315,57 @@
     bar.innerHTML = '<span>أنت تشاهد لوحة <b>' + esc(profile.full_name || profile.username) + '</b> (' + esc(ROLE_NAMES[profile.role] || '') + ' · <bdi dir="ltr">' + esc(profile.username) + '</bdi>) كدعم فني. أي إجراء يتسجّل باسمك.</span>' +
       '<button type="button" class="btn btn-gold btn-sm" data-viewas-exit>رجوع للوحة الدعم</button>';
   }
-  function viewAs(id) {
+  function viewAs(id, st, fromHistory) {
     var support = viewing ? viewing.support : profile;
     if (!support || support.role !== 'support' || support.status !== 'active') return Promise.resolve();
+    if (!fromHistory) navPush({ kind: 'viewas' }, id);
     loadingView();
     return sb.from('profiles').select('*').eq('id', id).single().then(function (r) {
       if (r.error) throw r.error;
       if (r.data.role === 'support') throw new Error('support profile');
       viewing = { support: support }; profile = r.data; viewBar();
-      return routeProfile();
-    }).catch(function (e) { console.error(e); exitViewAs(); toast('تعذّر فتح اللوحة'); });
+      return st && st.kind !== 'viewas' ? applyState(st) : routeProfile();
+    }).catch(function (e) { console.error(e); exitViewAs(true); toast('تعذّر فتح اللوحة'); });
   }
-  function exitViewAs() {
+  function exitViewAs(fromHistory) {
     if (viewing) { profile = viewing.support; viewing = null; }
+    if (!fromHistory) navPush({ kind: 'support', area: 'overview' }, null);
     viewBar(); closeModal(); return openSupport();
+  }
+
+  /* ---------- زر الرجوع في المتصفح ----------
+     كل انتقال داخل اللوحات (قسم، لوحة مستخدم، خطوة تسجيل) يضيف خطوة في سجل المتصفح،
+     فالرجوع يرجّع للشاشة اللي قبلها بدل ما يخرج من الموقع. */
+  function navPush(state, as) {
+    state.as = as !== undefined ? as : (viewing ? profile.id : null);
+    var cur = history.state && history.state.azm;
+    if (cur && JSON.stringify(cur) === JSON.stringify(state)) return;
+    try { history.pushState({ azm: state }, ''); } catch (e) { /* المتصفح رفض حفظ الخطوة */ }
+  }
+  function navBase() {
+    if (history.state && history.state.azm) return;
+    try { history.replaceState({ azm: { kind: 'home', as: null } }, ''); } catch (e) { /* المتصفح رفض حفظ الخطوة */ }
+  }
+  window.AZM_NAV = { push: function (state) { navPush(state); } };
+  function applyState(st) {
+    if (st.kind === 'staff' && (profile.role === 'coach' || profile.role === 'support')) return st.view === 'new' ? loadNewPlayers() : loadCoachRequests();
+    if (st.kind === 'super' && profile.role === 'super_admin' && window.AZM_SUPERVISOR) return window.AZM_SUPERVISOR.open({ sb: sb, profile: profile, root: $('app'), tab: st.tab });
+    if (st.kind === 'support' && profile.role === 'support') return openSupport(st.area);
+    return routeProfile();
+  }
+  window.addEventListener('popstate', function (e) { restoreState(e.state && e.state.azm); });
+  function restoreState(st) {
+    closeModal();
+    document.querySelectorAll('dialog[open]').forEach(function (d) { try { d.close(); } catch (x) { /* مقفولة */ } });
+    if (st && st.kind === 'reg') { reg = Object.assign({ method: null, order: null, reason: null }, st.reg); showReg(st.step, true); return; }
+    if (!session) { if (!st) render(); return; }
+    if (!profile || !st) { if (viewing) exitViewAs(true); else routeSignedIn(); return; }
+    if (st.as) {
+      if (viewing && profile.id === st.as) applyState(st); else viewAs(st.as, st, true);
+      return;
+    }
+    if (viewing) { profile = viewing.support; viewing = null; viewBar(); }
+    applyState(st);
   }
   function viewNoRequest(req) {
     return card(head(null, '', esc(profile.full_name || profile.username), req && req.status === 'rejected' ? 'آخر طلب تسجيل اترفض، وولي الأمر يقدر يعدّل ويرسل من جديد.' : 'عمل حسابه وما أرسل طلب التسجيل لسه.') +
@@ -342,7 +380,7 @@
   function loadingView() { show('<div class="loading"><div><div class="spinner"></div>جاري التحميل…</div></div>'); }
 
   // يقرر الشاشة المناسبة للمستخدم المسجّل دخوله. لو فيه تحميل جاري نرجّع نفسه بدل ما نكرره
-  var routing = null;
+  var routing = null, firstRoute = true;
   function routeSignedIn() {
     if (routing) return routing;
     routing = doRoute().then(function () { routing = null; }, function () { routing = null; });
@@ -379,8 +417,10 @@
         if (q.error) throw q.error;
         var req = q.data[0];
         if (req && req.status === 'pending') { show(viewPending(req)); return; }
+        // الدعم الفني يشوف حالة الحساب بس، وما يرسل طلب تسجيل بدل ولي الأمر
+        if (viewing) { show(viewNoRequest(req)); return; }
         reg = { method: null, order: null, reason: req && req.status === 'rejected' ? req.reject_reason : null };
-        showReg('method');
+        showReg('method', true);
       });
     });
   }
@@ -390,6 +430,11 @@
     return sb.from('profiles').select('*').eq('id', session.user.id).single().then(function (r) {
       if (r.error) throw r.error;
       profile = r.data;
+      // بعد تحديث الصفحة نرجع لنفس الشاشة اللي كان فيها، علشان زر الرجوع يفضل مظبوط
+      var saved = firstRoute && history.state && history.state.azm;
+      firstRoute = false;
+      if (saved && saved.kind !== 'home') { restoreState(saved); return; }
+      navBase();
       return routeProfile();
     }).catch(function (e) { console.error(e); show(card(head(null, '', 'تعذّر تحميل حسابك', friendly(e)) + '<button class="btn btn-gold btn-block" data-retry>حاول مرة ثانية</button>' + logoutLink())); });
   }
@@ -400,7 +445,7 @@
       if (h === 'firstuse' && activation) { show(viewFirstUse()); bindFirstUse(); return; }
       routeSignedIn(); return;
     }
-    if (h === 'signup' && MODE === 'parent') { reg = { method: null, order: null, reason: null }; showReg('method'); }
+    if (h === 'signup' && MODE === 'parent') { reg = { method: null, order: null, reason: null }; showReg('method', true); }
     else if (h === 'activate' && MODE === 'staff') { show(viewActivate()); bindActivate(); }
     else if (h === 'firstuse' && activation && MODE === 'staff') { show(viewFirstUse()); bindFirstUse(); }
     else { show(viewLogin()); bindLogin(); }
@@ -583,8 +628,11 @@
   }
   function stamp(ts) { var d = new Date(ts); return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' · ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
 
-  function openSupport() {
-    return window.AZM_SUPPORT.open({ sb: sb, profile: profile, root: $('app'), toast: toast, requests: loadCoachRequests, newPlayers: loadNewPlayers, viewAs: viewAs });
+  function openSupport(area) {
+    return window.AZM_SUPPORT.open({ sb: sb, profile: profile, root: $('app'), toast: toast, area: area,
+      requests: function () { navPush({ kind: 'staff', view: 'requests' }); return loadCoachRequests(); },
+      newPlayers: function () { navPush({ kind: 'staff', view: 'new' }); return loadNewPlayers(); },
+      viewAs: viewAs });
   }
 
   // الدعم الفني يراجع الطلبات ويفعّل الحساب، والمدرب يحدد مجموعة كل لاعب ومدة اشتراكه
@@ -754,9 +802,9 @@
     var t = e.target.closest('[data-activate], [data-assign], [data-reject], [data-refresh], [data-support-home], [data-staff-view]');
     if (!t) return;
     if (t.hasAttribute('data-support-home')) {
-      if (profile && profile.role === 'support' && window.AZM_SUPPORT) openSupport();
+      if (profile && profile.role === 'support' && window.AZM_SUPPORT) { navPush({ kind: 'support', area: 'overview' }); openSupport(); }
     }
-    else if (t.dataset.staffView) { e.preventDefault(); if (t.dataset.staffView === 'new') loadNewPlayers(); else loadCoachRequests(); }
+    else if (t.dataset.staffView) { e.preventDefault(); navPush({ kind: 'staff', view: t.dataset.staffView }); if (t.dataset.staffView === 'new') loadNewPlayers(); else loadCoachRequests(); }
     else if (t.dataset.activate) activateModal(findRequest(t.dataset.activate));
     else if (t.dataset.assign) assignModal(coach.newPlayers.filter(function (p) { return p.id === t.dataset.assign; })[0]);
     else if (t.dataset.reject) rejectModal(findRequest(t.dataset.reject));

@@ -77,7 +77,7 @@
     return '<button class="btn btn-ghost btn-sm" type="button" data-super-' + kind + '="' + escape(id) + '">' + label + '</button>';
   }
 
-  async function open({ sb, profile, root }) {
+  async function open({ sb, profile, root, tab: startTab }) {
     if (profile.role !== 'super_admin' || profile.status !== 'active') return;
     const read = D.readers(sb);
     const { data, error } = await sb.from('staff_permissions').select('section').eq('user_id', profile.id);
@@ -447,7 +447,12 @@
     shell.addEventListener('click', event => {
       const control = event.target.closest('button, a');
       if (!control) return;
-      if (control.dataset.superTab) { event.preventDefault(); load(control.dataset.superTab); }
+      if (control.dataset.superTab) {
+        event.preventDefault();
+        // خطوة في سجل المتصفح، فزر الرجوع يرجّع للقسم اللي قبله
+        if (control.dataset.superTab !== state.tab) window.AZM_NAV?.push({ kind: 'super', tab: control.dataset.superTab });
+        load(control.dataset.superTab);
+      }
       if (control.hasAttribute('data-super-refresh')) load();
       if (control.dataset.superPlayer) showPlayer(control.dataset.superPlayer);
       if (control.dataset.superReport) showReport(control.dataset.superReport);
@@ -490,7 +495,7 @@
         load();
       }
     });
-    await load();
+    await load(startTab && can(startTab) ? startTab : undefined);
   }
 
   window.AZM_SUPERVISOR = { open };

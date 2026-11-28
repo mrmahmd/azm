@@ -124,7 +124,9 @@
     return (compositeKeys.has(area) ? fields : ['id', ...fields]).join(',');
   }
 
-  function open({ sb, profile, root, toast, requests, newPlayers, viewAs }) {
+  function open({ sb, profile, root, toast, requests, newPlayers, viewAs, area: startArea }) {
+    // كل انتقال لقسم يضيف خطوة في سجل المتصفح، فزر الرجوع يرجّع للقسم اللي قبله
+    const go = area => { window.AZM_NAV?.push({ kind: 'support', area }); return load(area); };
     if (profile.role !== 'support' || profile.status !== 'active') return Promise.resolve();
     const current = { area: 'overview', search: '', profileField: 'full_name', page: 0, version: 0, rows: [], names: {}, total: 0, pending: false };
     root.innerHTML = '<div class="support-shell"><header class="support-head"><div class="support-brand">' +
@@ -473,7 +475,7 @@
         if (g.coach_id && (g.group_slots || []).length) continue;
         add('mid', 'مجموعة ' + g.name + (g.coach_id ? ' مالهاش مواعيد' : ' مالهاش مدرب'),
           g.coach_id ? 'أولياء الأمور مش هيشوفوا مواعيد الحصص.' : 'المدرب مش هيلاقي لاعبيها في «المشتركين الجدد».',
-          [{ label: 'ظبّط المجموعة', run: () => load('pricing'), primary: true }]);
+          [{ label: 'ظبّط المجموعة', run: () => go('pricing'), primary: true }]);
       }
       const order = { high: 0, mid: 1, low: 2 };
       list.sort((a, b) => order[a.level] - order[b.level]);
@@ -557,10 +559,10 @@
       const button = event.target.closest('button');
       if (!button) return;
       if (button.hasAttribute('data-dialog-close')) { if (!current.pending) dialog.close(); return; }
-      if (button.dataset.area) load(button.dataset.area);
+      if (button.dataset.area) go(button.dataset.area);
       if (button.hasAttribute('data-support-refresh')) load();
       if (button.hasAttribute('data-support-requests')) {
-        requests().catch(() => { open({ sb, profile, root, toast, requests }); toast('تعذر تحميل الطلبات'); });
+        requests().catch(() => { open({ sb, profile, root, toast, requests, newPlayers, viewAs }); toast('تعذر تحميل الطلبات'); });
       }
       if (button.dataset.step) { current.page += Number(button.dataset.step); load(); }
       if (button.dataset.detail !== undefined) {
@@ -722,7 +724,7 @@
       }
     });
     findProblems().then(r => setProblemCount(r.list.length), () => {});
-    return load();
+    return load(startArea === 'overview' || areas[startArea] ? startArea : 'overview');
   }
 
   window.AZM_SUPPORT = { open };
